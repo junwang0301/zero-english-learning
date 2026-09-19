@@ -606,6 +606,8 @@ function renderHome() {
   $('#recommendLessonTitle').textContent = next ? `第 ${next.num} 课 · ${next.title}` : '当前难度暂无课程';
   $('#recommendLessonText').textContent = next ? next.summary : '请切换其他难度继续学习。';
   $('#recommendLessonButton').dataset.lessonId = next ? next.id : '';
+  const roadmapTitle = $('#roadmapTitle');
+  if (roadmapTitle) roadmapTitle.textContent = (state.settings.level === 'CET4' ? 'CET-4' : state.settings.level) + ' 学习路线';
   $('#roadmapSummary').textContent = `${LEVEL_LABELS[state.settings.level]} · ${levelCourses.length} 个模块`;
   $('#homeRoadmap').innerHTML = levelCourses.map(item => {
     const isDone = !item.advanced && state.progress.completed[item.id] && state.progress.completed[item.id].completed;
