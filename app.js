@@ -1522,6 +1522,9 @@ function bindEvents() {
   $('#articleControls').addEventListener('submit', event => { event.preventDefault(); generateArticle(); });
   $('#aiSettingsForm').addEventListener('submit', event => { event.preventDefault(); saveSettingsForm(); });
   $('#vocabSearch').addEventListener('input', renderVocabulary);
+  $('#mobileLevelSelect').addEventListener('change', event => setGlobalLevel(event.target.value));
+  $('#articleLevel').addEventListener('change', event => setGlobalLevel(event.target.value));
+  $('#articleGrammar').addEventListener('change', updateReadingVideo);
   $('#importFile').addEventListener('change', event => { const file = event.target.files[0]; if (file) importData(file); event.target.value = ''; });
   $('#wordDrawer').addEventListener('click', event => { if (event.target === $('#wordDrawer')) closeWordDrawer(); });
   $('#articlePaper').addEventListener('mouseup', selectSentenceFromMouse);
