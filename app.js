@@ -704,7 +704,7 @@ function renderLessonVideoHtml(courseId) {
   const video = videoForCourse(courseId);
   if (!video) return '';
   const player = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(video.bvid)}&page=${video.page || 1}&high_quality=1&danmaku=0`;
-  return `<article class="content-card video-lesson-card"><div class="video-heading"><div><span class="eyebrow">视频授课</span><h2>${escapeHtml(video.title)}</h2></div><span class="video-teacher">${escapeHtml(video.teacher)}</span></div><div class="video-frame"><iframe src="${player}" loading="lazy" allowfullscreen title="${escapeHtml(video.title)}"></iframe></div><p class="video-note">${escapeHtml(video.note || '配套语法讲解')}</p><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站打开原视频 →</a></article>`;
+  return `<article class="content-card video-lesson-card"><div class="video-heading"><div><span class="eyebrow">视频授课</span><h2>${escapeHtml(video.title)}</h2></div><span class="video-teacher">${escapeHtml(video.teacher)}</span></div><button class="video-launch" type="button" data-action="play-video" data-video-src="${player}" data-video-title="${escapeHtml(video.title)}"><span>▶</span><strong>点击播放视频课程</strong><small>加载 B 站官方播放器</small></button><p class="video-note">${escapeHtml(video.note || '配套语法讲解')}</p><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站打开原视频 →</a></article>`;
 }
 function updateReadingVideo() {
   const panel = $('#lessonVideoPanel');
@@ -714,7 +714,7 @@ function updateReadingVideo() {
   if (!video) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
   const player = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(video.bvid)}&page=${video.page || 1}&high_quality=1&danmaku=0`;
   panel.classList.remove('hidden');
-  panel.innerHTML = `<span class="eyebrow">视频授课</span><h3>${escapeHtml(video.title)}</h3><p>${escapeHtml(video.note || '')}</p><small>来源：${escapeHtml(video.teacher)}</small><div class="video-frame compact"><iframe src="${player}" loading="lazy" allowfullscreen title="${escapeHtml(video.title)}"></iframe></div><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站观看 →</a>`;
+  panel.innerHTML = `<span class="eyebrow">视频授课</span><h3>${escapeHtml(video.title)}</h3><p>${escapeHtml(video.note || '')}</p><small>来源：${escapeHtml(video.teacher)}</small><button class="video-launch compact" type="button" data-action="play-video" data-video-src="${player}" data-video-title="${escapeHtml(video.title)}"><span>▶</span><strong>点击播放视频课程</strong><small>加载 B 站官方播放器</small></button><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站观看 →</a>`;
 }
 function renderLessonDetail(lesson) {
   const done = state.progress.completed[lesson.id] && state.progress.completed[lesson.id].completed;
@@ -1505,6 +1505,7 @@ async function handleClick(event) {
   else if (action === 'ai-lookup-word') lookupWordWithAI();
   else if (action === 'submit-practice') submitPractice(lessonList.find(item => item.id === state.progress.lastLessonId));
   else if (action === 'reset-practice') resetPractice(lessonList.find(item => item.id === state.progress.lastLessonId));
+  else if (action === 'play-video') { const src = actionButton.dataset.videoSrc; actionButton.outerHTML = `<div class="video-frame"><iframe src="${src}" loading="lazy" allowfullscreen title="${escapeHtml(actionButton.dataset.videoTitle || '视频课程')}"></iframe></div>`; }
   else if (action === 'regenerate-article') generateArticle();
   else if (action === 'open-reading-settings') { $('#articleControls').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#articleGrammar').focus(); }
   else if (action === 'toggle-all-translations') toggleAllTranslations();
@@ -1530,7 +1531,8 @@ function bindEvents() {
   $('#importFile').addEventListener('change', event => { const file = event.target.files[0]; if (file) importData(file); event.target.value = ''; });
   $('#wordDrawer').addEventListener('click', event => { if (event.target === $('#wordDrawer')) closeWordDrawer(); });
   $('#articlePaper').addEventListener('mouseup', selectSentenceFromMouse);
-  $('#articlePaper').addEventListener('touchend', selectSentenceFromMouse);
+  $('#articlePaper').addEventListener('touchend', () => setTimeout(selectSentenceFromMouse, 80));
+  document.addEventListener('selectionchange', () => { if (state.currentView === 'reading') setTimeout(selectSentenceFromMouse, 80); });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeWordDrawer(); $('#mobileNav').classList.add('hidden'); } });
 }
 function init() {
