@@ -446,3 +446,14 @@ img, iframe, video, select, textarea, input { max-width: 100%; }
   .article-toolbar { grid-template-columns: 1fr; }
   .mobile-level-wrap select { max-width: 66px; font-size: 12px; }
 }
+.video-launch { width: 100%; min-height: 210px; margin-top: 16px; display: grid; place-content: center; justify-items: center; gap: 7px; border: 0; border-radius: 14px; background: linear-gradient(135deg,#14251d,#284b3c); color: #fff; cursor: pointer; }
+.video-launch span { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 50%; background: var(--lime); color: #173326; font-size: 20px; }
+.video-launch strong { font-size: 16px; }
+.video-launch small { color: #bfd0c6; }
+.video-launch.compact { min-height: 130px; }
+@media (max-width: 620px) {
+  .filter-row { display: grid; grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .video-launch { min-height: 150px; }
+  .video-launch.compact { min-height: 112px; }
+  .mobile-nav { max-height: calc(100vh - 84px); overflow-y: auto; }
+}
