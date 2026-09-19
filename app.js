@@ -1421,6 +1421,8 @@ function renderAll() {
 }
 
 async function handleClick(event) {
+  const levelButton = event.target.closest('[data-level]');
+  if (levelButton) { setGlobalLevel(levelButton.dataset.level); return; }
   const viewButton = event.target.closest('[data-view]');
   if (viewButton) {
     const view = viewButton.dataset.view;
