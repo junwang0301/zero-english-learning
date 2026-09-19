@@ -198,9 +198,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .selected-sentence { margin: 8px 0 0; color: var(--muted); font-family: Georgia, serif; font-size: 14px; }
 .sentence-tools .drawer-actions { margin-top: 13px; }.word-token { display: inline; padding: 1px 2px; margin: 0; border: 0; border-bottom: 2px dashed transparent; border-radius: 3px; background: transparent; font: inherit; line-height: inherit; cursor: pointer; }
 .word-token:hover, .word-token:focus-visible { background: #eef4ef; }
-.word-token.grammar-cue { border-bottom-color: var(--blue); }
-.word-token.marked { background: var(--amber-soft); border-bottom-color: var(--amber); }
-.word-token.saved { background: #e1f0e8; border-bottom-color: var(--green); }
+.word-token.grammar-cue { background: rgba(66,107,143,.14); border-bottom: 2px solid var(--blue); }
+.word-token.marked { background: #ffe08a; border-bottom: 2px solid #d98c00; }
+.word-token.saved { background: #bfe6d0; border-bottom: 2px solid var(--green); }
 .article-toolbar { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--line); }
 .reading-side { display: grid; gap: 12px; position: sticky; top: 22px; }
 .side-card { padding: 20px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); }
@@ -208,11 +208,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .side-card p { margin: 0; color: var(--muted); font-size: 13px; }
 .side-card.compact strong, .side-card.compact span { display: block; }
 .side-card.compact span { color: var(--muted); font-size: 12px; margin-top: 3px; }
-.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; margin-top: 9px; color: var(--muted); font-size: 12px; }
-.legend-dot { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 50%; }
-.legend-dot.cue { background: var(--blue); }
-.legend-dot.marked { background: var(--amber); }
-.legend-dot.saved { background: var(--green); }
+.legend { display: grid; gap: 8px; margin-top: 10px; color: var(--muted); font-size: 12px; }\n.legend-item { display: flex; align-items: center; gap: 7px; padding: 7px 9px; border-radius: 9px; font-weight: 700; }\n.legend-item.cue { background: rgba(66,107,143,.12); color: var(--blue); }\n.legend-item.marked { background: #fff0bd; color: #8a5c00; }\n.legend-item.saved { background: #d8f0e2; color: var(--green); }
+.legend-dot { display: inline-block; width: 18px; height: 5px; border-radius: 999px; }
+.legend-item.cue .legend-dot { background: var(--blue); }
+.legend-item.marked .legend-dot { background: #d98c00; }
+.legend-item.saved .legend-dot { background: var(--green); }
 .vocab-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin: 23px 0 15px; }
 .search-field { min-width: 290px; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 .search-field input { width: 100%; border: 0; outline: 0; background: transparent; }
@@ -331,3 +331,33 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 
 .answer-requirements { margin: 7px 0 10px; padding: 8px 10px; border-radius: 9px; background: #f3f6f2; color: #58655e; font-size: 12px; line-height: 1.55; }
+
+.level-switcher { margin: 24px 0 0; padding: 13px; border: 1px solid rgba(255,255,255,.09); border-radius: 14px; background: rgba(255,255,255,.045); }
+.level-switcher > span { display: block; margin-bottom: 9px; color: #aebbb4; font-size: 11px; }
+.level-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.level-buttons button { padding: 7px 4px; border: 0; border-radius: 8px; background: rgba(255,255,255,.07); color: #c9d4ce; cursor: pointer; font-size: 11px; }
+.level-buttons button.active { background: var(--lime); color: #27422f; font-weight: 800; }
+.mobile-level-wrap { display: flex; align-items: center; gap: 8px; }
+.mobile-level-wrap select { max-width: 82px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.word-phonetic { margin-top: -5px; color: var(--muted); font-size: 12px; }
+.word-mnemonic { margin: 10px 0 0; padding: 10px; border-radius: 10px; background: #f6f2e8; color: #63583e; font-size: 12px; line-height: 1.55; }
+.mnemonic-box { margin-top: 18px; padding: 17px; border-radius: 14px; background: #fff6df; }
+.mnemonic-box span { display: block; margin-bottom: 5px; color: #80632a; font-size: 11px; font-weight: 700; }
+.mnemonic-box p { margin: 0; color: #5d5135; }
+.video-lesson-card { overflow: hidden; }
+.video-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.video-heading h2 { margin-bottom: 0; }
+.video-teacher { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 11px; font-weight: 700; }
+.video-frame { position: relative; width: 100%; margin-top: 16px; border-radius: 14px; overflow: hidden; background: #101914; aspect-ratio: 16 / 9; }
+.video-frame iframe { width: 100%; height: 100%; border: 0; }
+.video-frame.compact { margin: 12px 0; }
+.video-note { margin: 11px 0 4px; color: var(--muted); font-size: 12px; }
+.study-panel { margin-bottom: 18px; padding: 26px; border-radius: 22px; background: #15251e; color: #fff; }
+.study-panel .text-button { color: var(--lime); }
+.study-options { display: grid; gap: 9px; margin-top: 18px; }
+.study-option { padding: 12px 14px; border: 1px solid rgba(255,255,255,.13); border-radius: 11px; background: rgba(255,255,255,.06); color: #fff; text-align: left; cursor: pointer; }
+.study-option:hover { background: rgba(255,255,255,.12); }
+.study-input-row { display: flex; gap: 9px; margin-top: 18px; }
+.study-input-row input { flex: 1; min-width: 0; padding: 11px 12px; border: 1px solid rgba(255,255,255,.16); border-radius: 11px; background: rgba(255,255,255,.08); color: #fff; }
+.study-input-row input::placeholder { color: #aebcb4; }
+@media (max-width: 860px) { .level-switcher { display: none; } }
