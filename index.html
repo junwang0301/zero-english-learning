@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="零基础英语语法学习、文章阅读与生词记忆">
+  <title>英语起步课 · 零基础 A1 学习站</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <button class="brand" type="button" data-view="home" aria-label="回到首页">
+        <span class="brand-mark">En</span>
+        <span><strong>英语起步课</strong><small>从语法开始读懂英语</small></span>
+      </button>
+      <nav class="nav-list">
+        <button class="nav-item active" type="button" data-view="home"><span>⌂</span>学习首页</button>
+        <button class="nav-item" type="button" data-view="grammar"><span>课</span>语法课堂</button>
+        <button class="nav-item" type="button" data-view="reading"><span>读</span>阅读实验室</button>
+        <button class="nav-item" type="button" data-view="vocabulary"><span>词</span>我的单词本 <b id="navDueCount" class="nav-badge hidden">0</b></button>
+        <button class="nav-item" type="button" data-view="settings"><span>⚙</span>AI 与数据</button>
+      </nav>
+      <div class="sidebar-card">
+        <div class="eyebrow">今日复习</div>
+        <strong><span id="sidebarDueCount">0</span> 个词到期</strong>
+        <p>先复习，再读一篇目标语法短文。</p>
+        <button class="text-button" type="button" data-action="start-due-review">开始复习 →</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="mobile-header">
+        <button class="mobile-brand" type="button" data-view="home">英语起步课</button>
+        <button class="icon-button" type="button" data-action="open-mobile-nav" aria-label="打开菜单">☰</button>
+      </header>
+      <div id="mobileNav" class="mobile-nav hidden" aria-label="移动端导航"></div>
+
+      <section id="view-home" class="view active" aria-labelledby="homeTitle">
+        <div class="hero">
+          <div class="hero-copy">
+            <span class="pill">零基础 → CET-4 路线</span>
+            <h1 id="homeTitle">先把句子看懂，<br><em>再把英语用起来。</em></h1>
+            <p>20 节基础语法课，配合目标语法文章阅读。遇到不会的词，点一下就能标注并加入单词本。</p>
+            <div class="hero-actions">
+              <button class="primary-button" type="button" data-action="continue-learning">继续学习</button>
+              <button class="secondary-button" type="button" data-view="reading">生成一篇文章</button>
+            </div>
+          </div>
+          <div class="hero-visual" aria-hidden="true">
+            <div class="formula-card">
+              <span>核心公式</span>
+              <strong>主语 + 动词 + 其他</strong>
+              <p>I <mark>read</mark> English every day.</p>
+              <p class="translation">我每天读英语。</p>
+            </div>
+            <div class="floating-note">语法不是规则表，<br>是读懂句子的地图。</div>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <article class="stat-card"><span>课程进度</span><strong id="statLessonProgress">0 / 20</strong><div class="mini-progress"><i id="statLessonBar"></i></div></article>
+          <article class="stat-card"><span>生词本</span><strong id="statWordCount">0</strong><small>个单词正在记忆</small></article>
+          <article class="stat-card"><span>今日待复习</span><strong id="statDueCount">0</strong><small>按记忆间隔安排</small></article>
+          <article class="stat-card"><span>本周学习</span><strong id="statStudyDays">0</strong><small>天有学习记录</small></article>
+        </div>
+
+        <div class="section-heading">
+          <div><span class="eyebrow">TODAY</span><h2>今天这样学</h2></div>
+          <button class="text-button" type="button" data-view="grammar">查看全部课程 →</button>
+        </div>
+        <div class="today-grid">
+          <article class="today-card promise-card">
+            <span class="step-number">01</span>
+            <h3 id="recommendLessonTitle">从第一课开始</h3>
+            <p id="recommendLessonText">先认识英语句子的主语和谓语，建立最基本的句子概念。</p>
+            <button class="primary-button small" id="recommendLessonButton" type="button">进入课程</button>
+          </article>
+          <article class="today-card reading-card">
+            <span class="step-number">02</span>
+            <h3>读一篇匹配短文</h3>
+            <p>把刚学的语法放进真实语境，点击生词即可查看释义并加入单词本。</p>
+            <button class="secondary-button small" type="button" data-view="reading">去阅读</button>
+          </article>
+          <article class="today-card review-card">
+            <span class="step-number">03</span>
+            <h3>复习到期生词</h3>
+            <p>用“忘了、模糊、记住”三种反馈安排下次复习时间。</p>
+            <button class="secondary-button small" type="button" data-action="start-due-review">开始记忆</button>
+          </article>
+        </div>
+
+        <div class="section-heading">
+          <div><span class="eyebrow">ROADMAP</span><h2>A1 学习路线</h2></div>
+          <span class="muted" id="roadmapSummary">完成 0 节</span>
+        </div>
+        <div id="homeRoadmap" class="roadmap-grid"></div>
+      </section>
+
+      <section id="view-grammar" class="view" aria-labelledby="grammarTitle">
+        <div class="page-heading">
+          <div><span class="eyebrow">GRAMMAR</span><h1 id="grammarTitle">语法课堂</h1><p>A1 核心课程打好基础，四级进阶模块训练从句、非谓语、被动、虚拟语气和长难句。</p></div>
+          <div class="progress-ring" id="grammarProgressRing"><strong>0%</strong><span>完成度</span></div>
+        </div>
+        <div id="lessonFilters" class="filter-row" aria-label="课程筛选"></div>
+        <div id="lessonGrid" class="lesson-grid"></div>
+      </section>
+
+      <section id="view-lesson" class="view" aria-labelledby="lessonTitle">
+        <button class="back-button" type="button" data-view="grammar">← 返回语法课堂</button>
+        <div id="lessonDetail"></div>
+      </section>
+
+      <section id="view-reading" class="view" aria-labelledby="readingTitle">
+        <div class="page-heading reading-heading">
+          <div><span class="eyebrow">READING LAB</span><h1 id="readingTitle">阅读实验室</h1><p>选择语法点，按所选难度生成文章；未配置 AI 时会使用本地文章。</p></div>
+          <div id="aiStatusBadge" class="status-badge neutral">AI 未配置 · 本地模式</div>
+        </div>
+        <form id="articleControls" class="article-controls">
+          <label>目标语法<select id="articleGrammar"></select></label>
+          <label>学习难度<select id="articleLevel"><option value="A1">A1 零基础</option><option value="A2">A2 基础</option><option value="B1">B1 进阶</option><option value="CET4">CET-4 四级</option></select></label>
+          <label>文章主题<select id="articleTopic"><option value="life">日常生活</option><option value="school">校园学习</option><option value="family">家庭朋友</option><option value="travel">旅行见闻</option><option value="hobby">兴趣爱好</option></select></label>
+          <button class="primary-button" type="submit"><span id="generateButtonLabel">生成文章</span></button>
+        </form>
+        <div class="reading-workspace">
+          <article class="article-paper" id="articlePaper">
+            <div class="article-empty">
+              <span>Read</span>
+              <h2>准备生成你的第一篇文章</h2>
+              <p>选择左侧语法点和主题。文章生成后，点击任意英文单词查看释义、发音并加入单词本。</p>
+            </div>
+          </article>
+          <aside class="reading-side">
+            <div class="side-card">
+              <span class="eyebrow">阅读方法</span>
+              <h3>不要逐词翻译</h3>
+              <p>先读完整句，再点击影响理解的词。把词放回原句记忆，比孤立背单词更牢固。</p>
+            </div>
+            <div class="side-card">
+              <span class="eyebrow">标记说明</span>
+              <div class="legend"><i class="legend-dot cue"></i>目标语法 <i class="legend-dot marked"></i>已标注 <i class="legend-dot saved"></i>已入单词本</div>
+            </div>
+            <div id="sentenceTools" class="side-card hidden">
+              <span class="eyebrow">已选句子</span>
+              <p class="selected-sentence"></p>
+            </div>            <div class="side-card compact">
+              <strong id="articleWordCount">0 个词</strong>
+              <span>点击任意单词开始标注</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="view-vocabulary" class="view" aria-labelledby="vocabularyTitle">
+        <div class="page-heading">
+          <div><span class="eyebrow">MY WORDS</span><h1 id="vocabularyTitle">我的单词本</h1><p>单词结合阅读原句记忆，系统会根据你的反馈安排下一次复习。</p></div>
+          <div class="page-actions">
+            <button class="secondary-button" type="button" data-action="start-all-review">复习全部</button>
+            <button class="primary-button" type="button" data-action="start-due-review">复习到期词</button>
+          </div>
+        </div>
+        <div id="reviewPanel" class="review-panel hidden" aria-live="polite"></div>
+        <div class="vocab-toolbar">
+          <label class="search-field"><span>⌕</span><input id="vocabSearch" type="search" placeholder="搜索单词或释义"></label>
+          <span id="vocabSummary" class="muted">暂无生词</span>
+        </div>
+        <div id="vocabularyList" class="vocabulary-list"></div>
+      </section>
+
+      <section id="view-settings" class="view" aria-labelledby="settingsTitle">
+        <div class="page-heading">
+          <div><span class="eyebrow">SETTINGS & DATA</span><h1 id="settingsTitle">AI 与学习数据</h1><p>网站为纯静态页面。AI Key 只保存在当前浏览器，并直接发送到你配置的服务商。</p></div>
+        </div>
+        <div class="settings-grid">
+          <form id="aiSettingsForm" class="settings-card">
+            <div class="card-heading"><span class="card-icon">AI</span><div><h2>文章生成设置</h2><p>支持 OpenAI 兼容的 Chat Completions 接口。</p></div></div>
+            <label>接口地址<input id="settingBaseUrl" type="url" placeholder="https://api.openai.com/v1" autocomplete="off"></label>
+            <label>模型名称<input id="settingModel" type="text" placeholder="填写你的服务商支持的模型名" autocomplete="off"></label>
+            <label>API Key<input id="settingApiKey" type="password" placeholder="sk-..." autocomplete="off"></label>
+            <p class="form-note">浏览器直连需要服务商允许 CORS。公开网站不要共用同一把 Key。</p>
+            <div class="form-actions"><button class="primary-button" type="submit">保存设置</button><button class="secondary-button" type="button" data-action="clear-ai-settings">清空 Key</button></div>
+          </form>
+          <div class="settings-card">
+            <div class="card-heading"><span class="card-icon">DB</span><div><h2>学习数据备份</h2><p>课程进度、生词本和文章记录都保存在本机。</p></div></div>
+            <div class="data-row"><div><strong>导出备份</strong><span>下载一个 JSON 文件</span></div><button class="secondary-button" type="button" data-action="export-data">导出</button></div>
+            <div class="data-row"><div><strong>导入备份</strong><span>导入前会校验并替换当前数据</span></div><button class="secondary-button" type="button" data-action="import-data">选择文件</button><input id="importFile" class="hidden" type="file" accept="application/json,.json"></div>
+            <div class="data-row danger"><div><strong>清空学习数据</strong><span>课程进度和生词本将被删除</span></div><button class="danger-button" type="button" data-action="clear-data">清空</button></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="wordDrawer" class="drawer-backdrop hidden" aria-hidden="true">
+    <aside class="word-drawer" role="dialog" aria-modal="true" aria-labelledby="drawerWord">
+      <button class="drawer-close" type="button" data-action="close-word-drawer" aria-label="关闭">×</button>
+      <span id="drawerGrammar" class="eyebrow">生词卡</span>
+      <div class="drawer-word-row"><h2 id="drawerWord">word</h2><button class="speak-button" type="button" data-action="speak-current" aria-label="朗读单词">听</button></div>
+      <p id="drawerPhonetic" class="phonetic"></p>
+      <div class="definition-box"><span>释义</span><strong id="drawerMeaning">暂无释义</strong></div>
+      <div class="context-box"><span>文章原句</span><p id="drawerContext"></p><small id="drawerContextZh"></small></div>
+      <div id="drawerExample" class="example-line hidden"></div>
+      <div class="drawer-actions">
+        <button id="drawerMarkButton" class="secondary-button" type="button" data-action="toggle-word-mark">标注生词</button>
+        <button id="drawerSaveButton" class="primary-button" type="button" data-action="toggle-word-save">加入单词本</button>
+        <button id="drawerLookupButton" class="text-button hidden" type="button" data-action="ai-lookup-word">AI 查询上下文释义</button>
+      </div>
+      <p class="drawer-hint">标注用于文章内提醒；加入单词本后会进入间隔复习。</p>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="loadingMask" class="loading-mask hidden" aria-live="polite"><div class="spinner"></div><strong id="loadingText">正在生成文章…</strong><span>通常需要几秒钟</span></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
