@@ -609,9 +609,15 @@ function feedbackHtml(result, text, type = '') {
   if (result === null || result === undefined) return text ? `<div class="answer-feedback info">${escapeHtml(text)}</div>` : '';
   return `<div class="answer-feedback ${result ? 'ok' : 'no'}">${escapeHtml(text || (result ? '回答正确。' : '再检查一下。'))}</div>`;
 }
+function fillRequirement(question) {
+  if (question.answer.includes(';')) return '答题要求：按顺序填写每个空，用分号隔开；必须符合题目给出的语法范围。';
+  const count = normalizeAnswer(question.answer).split(/\s+/).filter(Boolean).length;
+  const range = question.hint ? `；语法范围：${question.hint}` : '';
+  return `答题要求：只填写 ${count} 个英文单词，不要重写整句${range}。若有多个答案符合语法和句意，AI 会按正确答案处理。`;
+}
 function renderMcq(question, index, session) {
   const selected = session.answers.mcq[index];
-  return `<div class="practice-question"><span class="question-label">选择题 ${index + 1}</span><div class="question-text">${escapeHtml(question.q)}</div><div class="option-list">
+  return `<div class="practice-question"><span class="question-label">选择题 ${index + 1}</span><div class="question-text">${escapeHtml(question.q)}</div><div class="answer-requirements">答题要求：只选择一个最符合题意的答案。</div><div class="option-list">
     ${question.options.map((option, optionIndex) => {
       const classes = [];
       if (selected === optionIndex) classes.push('selected');
@@ -621,12 +627,13 @@ function renderMcq(question, index, session) {
       }
       return `<button class="option-button ${classes.join(' ')}" type="button" data-mcq-index="${index}" data-option-index="${optionIndex}" ${session.submitted ? 'disabled' : ''}>${String.fromCharCode(65 + optionIndex)}. ${escapeHtml(option)}</button>`;
     }).join('')}
-  </div>${session.submitted ? feedbackHtml(session.results.mcq[index], question.explain) : ''}</div>`;
+  </div>${session.submitted ? feedbackHtml(session.results.mcq[index], session.feedback.mcq[index] || question.explain) : ''}</div>`;
 }
 function renderFill(question, index, session) {
   const value = session.answers.fill[index] || '';
   const result = session.results.fill[index];
-  return `<div class="practice-question"><span class="question-label">填空题 ${index + 1}</span><div class="question-text">${escapeHtml(question.q)}</div><input class="fill-input" data-fill-index="${index}" value="${escapeHtml(value)}" ${session.submitted ? 'disabled' : ''} placeholder="${escapeHtml(question.hint || '输入答案')}">${session.submitted ? feedbackHtml(result, (result ? '正确。' : `参考答案：${question.answer}。`) + question.explain) : ''}</div>`;
+  const feedback = session.feedback.fill[index] || (result ? '回答正确。' : `参考答案：${question.answer}。${question.explain}`);
+  return `<div class="practice-question"><span class="question-label">填空题 ${index + 1}</span><div class="question-text">${escapeHtml(question.q)}</div><div class="answer-requirements">${escapeHtml(fillRequirement(question))}</div><input class="fill-input" data-fill-index="${index}" value="${escapeHtml(value)}" ${session.submitted ? 'disabled' : ''} placeholder="${escapeHtml(question.hint || '输入答案')}">${session.submitted ? feedbackHtml(result, feedback) : ''}</div>`;
 }
 function renderTranslation(question, index, session) {
   const value = session.answers.translations[index] || '';
@@ -636,10 +643,10 @@ function renderTranslation(question, index, session) {
     if (result === null || result === undefined) {
       feedback = `<div class="answer-feedback info">参考答案：${escapeHtml(question.answer)}<div class="self-grade"><button type="button" data-self-grade="true" data-translation-index="${index}">我写对了</button><button type="button" data-self-grade="false" data-translation-index="${index}">仍需练习</button></div></div>`;
     } else {
-      feedback = feedbackHtml(result, `参考答案：${question.answer}`);
+      feedback = feedbackHtml(result, session.feedback.translations[index] || `参考答案：${question.answer}`);
     }
   }
-  return `<div class="practice-question"><span class="question-label">翻译题 ${index + 1}</span><div class="question-text">${escapeHtml(question.zh)}</div><textarea class="translation-input" data-translation-index="${index}" ${session.submitted ? 'disabled' : ''} placeholder="写下你的英文翻译">${escapeHtml(value)}</textarea>${feedback}</div>`;
+  return `<div class="practice-question"><span class="question-label">翻译题 ${index + 1}</span><div class="question-text">${escapeHtml(question.zh)}</div><div class="answer-requirements">答题要求：完整翻译整句，不要求和参考答案逐字相同；AI 会判断语义和语法。</div><textarea class="translation-input" data-translation-index="${index}" ${session.submitted ? 'disabled' : ''} placeholder="写下你的英文翻译">${escapeHtml(value)}</textarea>${feedback}</div>`;
 }
 function renderLessonPractice(lesson) {
   const session = state.lessonSession;
@@ -649,14 +656,12 @@ function renderLessonPractice(lesson) {
   const correct = definite.filter(Boolean).length;
   const percent = session.submitted ? Math.round(correct / total * 100) : 0;
   const resultText = session.submitted ? `本次 ${correct}/${total} 题正确，正确率 ${percent}%。${percent >= 70 ? '已达到完成标准。' : '达到 70% 即可完成本课。'}` : '';
-  return `<div class="content-card"><h2>课堂练习</h2><p class="muted">共 ${total} 题。选择题和填空题立即判定；翻译题优先使用 AI 批改，未配置时根据参考答案自评。</p>
+  return `<div class="content-card"><h2>课堂练习</h2><p class="muted">共 ${total} 题。提交后 AI 统一批改选择题、填空题和翻译题，并给出逐题反馈；未配置 AI 时使用本地答案判定和自评。</p>
     <div id="practiceQuestions">${lesson.mcq.map((q, i) => renderMcq(q, i, session)).join('')}${lesson.fill.map((q, i) => renderFill(q, i, session)).join('')}${lesson.translations.map((q, i) => renderTranslation(q, i, session)).join('')}</div>
     <div class="practice-result ${session.submitted ? 'show' : ''}"><span class="eyebrow">练习结果</span><strong>${session.submitted ? percent + '%' : ''}</strong><p>${resultText}</p></div>
-    <div class="form-actions"><button class="primary-button" type="button" data-action="submit-practice" ${session.submitted ? 'disabled' : ''}>提交练习</button><button class="secondary-button" type="button" data-action="reset-practice">重做本课</button></div>
+    <div class="form-actions"><button class="primary-button" type="button" data-action="submit-practice" ${session.submitted ? 'disabled' : ''}>${isAIConfigured() ? '提交并交给 AI 批改' : '提交练习'}</button><button class="secondary-button" type="button" data-action="reset-practice">重做本课</button></div>
   </div>`;
-}
-
-function renderLessonDetail(lesson) {
+}function renderLessonDetail(lesson) {
   const done = state.progress.completed[lesson.id] && state.progress.completed[lesson.id].completed;
   const previous = lessonByOffset(lesson.id, -1);
   const next = lessonByOffset(lesson.id, 1);
@@ -681,7 +686,7 @@ function openLesson(id) {
   state.progress.lastLessonId = id;
   writeJSON(STORAGE.progress, state.progress);
   touchStudy();
-  state.lessonSession = { answers: { mcq: {}, fill: {}, translations: {} }, results: { mcq: Array(lesson.mcq.length).fill(null), fill: Array(lesson.fill.length).fill(null), translations: Array(lesson.translations.length).fill(null) }, submitted: false };
+  state.lessonSession = { answers: { mcq: {}, fill: {}, translations: {} }, results: { mcq: Array(lesson.mcq.length).fill(null), fill: Array(lesson.fill.length).fill(null), translations: Array(lesson.translations.length).fill(null) }, feedback: { mcq: {}, fill: {}, translations: {} }, submitted: false };
   renderLessonDetail(lesson);
   showView('lesson');
 }
@@ -707,39 +712,61 @@ function updateLessonScore(lesson) {
     renderHome();
   }
 }
+function localPracticeResults(lesson) {
+  const session = state.lessonSession;
+  const mcq = lesson.mcq.map((question, index) => session.answers.mcq[index] === question.answer);
+  const fill = lesson.fill.map((question, index) => normalizeAnswer(session.answers.fill[index]) === normalizeAnswer(question.answer));
+  const translations = lesson.translations.map((question, index) => {
+    const accepted = [question.answer].concat(question.accepts || []).map(normalizeAnswer);
+    return accepted.includes(normalizeAnswer(session.answers.translations[index])) ? true : null;
+  });
+  return { mcq, fill, translations, feedback: { mcq: {}, fill: {}, translations: {} } };
+}
+function applyAIGrades(results, grades) {
+  const apply = (type, list) => {
+    list.forEach((question, index) => {
+      const item = (grades[type] || []).find(entry => Number(entry.index) === index);
+      if (item && typeof item.correct === 'boolean') results[type][index] = item.correct;
+      if (item && item.feedback) results.feedback[type][index] = `AI 批改：${item.feedback}`;
+    });
+    if (type === 'fill') list.forEach((question, index) => {
+      if (results.fill[index] === false && !results.feedback.fill[index]) results.feedback.fill[index] = `参考答案：${question.answer}`;
+    });
+    if (type === 'translations') list.forEach((question, index) => {
+      if (results.translations[index] === false && !results.feedback.translations[index]) results.feedback.translations[index] = `参考答案：${question.answer}`;
+    });
+  };
+  apply('mcq', results.mcq);
+  apply('fill', results.fill);
+  apply('translations', results.translations);
+  return results;
+}
 async function submitPractice(lesson) {
   if (state.lessonSession.submitted) return;
   collectPracticeAnswers(lesson);
   const session = state.lessonSession;
-  session.results.mcq = lesson.mcq.map((question, index) => session.answers.mcq[index] === question.answer);
-  session.results.fill = lesson.fill.map((question, index) => normalizeAnswer(session.answers.fill[index]) === normalizeAnswer(question.answer));
-  const unresolved = [];
-  session.results.translations = lesson.translations.map((question, index) => {
-    const answer = session.answers.translations[index];
-    const accepted = [question.answer].concat(question.accepts || []).map(normalizeAnswer);
-    if (accepted.includes(normalizeAnswer(answer))) return true;
-    unresolved.push(index);
-    return null;
-  });
+  let results = localPracticeResults(lesson);
   session.submitted = true;
-  if (unresolved.length && isAIConfigured()) {
-    setLoading(true, 'AI 正在批改翻译…');
+  if (isAIConfigured()) {
+    setLoading(true, 'AI 正在批改整组练习…');
     try {
-      const graded = await gradeTranslations(lesson, unresolved);
-      unresolved.forEach((questionIndex, i) => { session.results.translations[questionIndex] = Boolean(graded[i]); });
+      const grades = await gradeLessonWithAI(lesson);
+      results = applyAIGrades(results, grades);
     } catch (error) {
-      console.warn('翻译批改失败', error);
-      showToast('AI 批改失败，已改为自评');
+      console.warn('AI 整组批改失败，使用本地判定', error);
+      showToast('AI 批改失败，已使用本地判定和自评');
     } finally {
       setLoading(false);
     }
   }
+  session.results = { mcq: results.mcq, fill: results.fill, translations: results.translations };
+  session.feedback = results.feedback;
   updateLessonScore(lesson);
   renderLessonDetail(lesson);
-  if (!session.ready) showToast('请对照参考答案完成翻译自评');
+  if (!session.ready) showToast('部分翻译题需要对照参考答案自评');
+  else if (isAIConfigured()) showToast('AI 已完成整组批改');
   else showToast(session.score >= 70 ? '练习完成，已记录本课进度' : '本次未达到 70%，可以重做');
-}
-function resetPractice(lesson) {
+}function resetPractice(lesson) {
   openLesson(lesson.id);
   showToast('已重置本课练习');
 }
@@ -781,16 +808,21 @@ async function callAI(messages, temperature = 0.5) {
     clearTimeout(timeout);
   }
 }
-async function gradeTranslations(lesson, indexes) {
-  const items = indexes.map(index => ({ index, chinese: lesson.translations[index].zh, reference: lesson.translations[index].answer, student: state.lessonSession.answers.translations[index] }));
-  const prompt = `你是零基础英语老师。请批改下面的中译英答案，允许合理的不同表达，只返回 JSON：{"results":[true,false]}。results 的顺序必须与输入完全一致。\n${JSON.stringify(items)}`;
-  const content = await callAI([{ role: 'user', content: prompt }], 0);
-  const parsed = extractJSON(content);
-  if (!parsed || !Array.isArray(parsed.results)) throw new Error('AI 批改格式错误');
-  return parsed.results;
-}
-
-function lookupDictionary(raw) {
+async function gradeLessonWithAI(lesson) {
+  const session = state.lessonSession;
+  const payload = {
+    mcq: lesson.mcq.map((question, index) => ({ index, question: question.q, options: question.options, officialAnswer: question.options[question.answer], studentAnswer: session.answers.mcq[index] == null ? '' : question.options[session.answers.mcq[index]] })),
+    fill: lesson.fill.map((question, index) => ({ index, question: question.q, referenceAnswer: question.answer, requirement: fillRequirement(question), grammarHint: question.hint || '', studentAnswer: session.answers.fill[index] })),
+    translations: lesson.translations.map((question, index) => ({ index, chinese: question.zh, referenceAnswer: question.answer, studentAnswer: session.answers.translations[index] }))
+  };
+  const prompt = `你是严谨但宽容的英语老师。请批改下面整组练习。选择题只判断学生所选选项；填空题只要符合题目限制、语法和句意就应算对，不必与参考答案逐字相同；翻译题判断语义和语法，合理的不同表达应算对。只返回 JSON，结构为：{"mcq":[{"index":0,"correct":true,"feedback":"简短中文反馈"}],"fill":[{"index":0,"correct":true,"feedback":"简短中文反馈"}],"translations":[{"index":0,"correct":true,"feedback":"简短中文反馈"}]}。每个数组必须覆盖全部题目，feedback 要指出错误原因或改进点。\n${JSON.stringify(payload)}`;
+  const parsed = extractJSON(await callAI([{ role: 'user', content: prompt }], 0));
+  return {
+    mcq: Array.isArray(parsed.mcq) ? parsed.mcq : [],
+    fill: Array.isArray(parsed.fill) ? parsed.fill : [],
+    translations: Array.isArray(parsed.translations) ? parsed.translations : []
+  };
+}function lookupDictionary(raw) {
   const word = normalizeWord(raw);
   const candidates = [word, aliases[word], word.replace(/ies$/, 'y'), word.replace(/es$/, ''), word.replace(/s$/, ''), word.replace(/ed$/, ''), word.replace(/ing$/, '')].filter(Boolean);
   for (const key of candidates) {
