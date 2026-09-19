@@ -1,0 +1,40 @@
+'use strict';
+const videoCatalog = {
+  xiaoyanBasic: { bvid: 'BV1UXdhBCEkb', page: 2, title: '【专升本英语】【刘晓艳】语法精讲', teacher: '英语老师晓艳', source: 'https://www.bilibili.com/video/BV1UXdhBCEkb' },
+  xiaoyanJunior: { bvid: 'BV1UEFNz1EfS', page: 2, title: '【初中英语】语法精讲', teacher: '英语老师晓艳', source: 'https://www.bilibili.com/video/BV1UEFNz1EfS' },
+  rabbitGrammar: { bvid: 'BV1XY411J7aG', page: 2, title: '英语语法精讲合集', teacher: '英语兔', source: 'https://www.bilibili.com/video/BV1XY411J7aG' },
+  rabbitClause: { bvid: 'BV1764y1f7nq', page: 2, title: '所有英语从句，一个视频合集搞定', teacher: '英语兔', source: 'https://www.bilibili.com/video/BV1764y1f7nq' },
+  xiaoyanNonfinite: { bvid: 'BV1eo4y1x7ko', page: 1, title: '五分钟搞定谓语与非谓语动词', teacher: '英语老师晓艳', source: 'https://www.bilibili.com/video/BV1eo4y1x7ko' }
+};
+const lessonVideos = {
+  sentence: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 2, note: '句子结构与中英文语序比较' }),
+  pronoun: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 16, note: '人称代词、物主代词和指示代词' }),
+  be: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 11, note: '系动词与 be 动词' }),
+  article: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 17, note: '不定冠词与定冠词' }),
+  plural: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 8, note: '可数名词、不可数名词和单复数' }),
+  demonstrative: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 16, note: '指示代词 this / that / these / those' }),
+  therebe: Object.assign({}, videoCatalog.rabbitGrammar, { page: 23, note: '句子成分与基本句型' }),
+  havehas: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 10, note: '实义动词与 have / has' }),
+  present: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 20, note: '一般现在时与一般将来时' }),
+  presentneg: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 20, note: '一般现在时的否定与疑问' }),
+  frequency: Object.assign({}, videoCatalog.rabbitGrammar, { page: 18, note: '副词与频率表达' }),
+  continuous: Object.assign({}, videoCatalog.rabbitGrammar, { page: 4, note: '动词时态：进行体' }),
+  can: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 12, note: '情态动词 can' }),
+  modal: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 12, note: '情态动词 must 与 should' }),
+  preposition: Object.assign({}, videoCatalog.rabbitGrammar, { page: 13, note: '时间与地点介词' }),
+  pastbe: Object.assign({}, videoCatalog.rabbitGrammar, { page: 4, note: '动词时态：一般过去时' }),
+  pastregular: Object.assign({}, videoCatalog.rabbitGrammar, { page: 4, note: '规则动词过去式' }),
+  pastirregular: Object.assign({}, videoCatalog.rabbitGrammar, { page: 4, note: '不规则动词与过去时' }),
+  future: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 20, note: '一般将来时 will / be going to' }),
+  comparative: Object.assign({}, videoCatalog.xiaoyanBasic, { page: 15, note: '形容词、副词与比较级' }),
+  'cet-tenses': Object.assign({}, videoCatalog.rabbitGrammar, { page: 4, note: '时态综合复习' }),
+  'cet-passive': Object.assign({}, videoCatalog.rabbitGrammar, { page: 24, note: '被动语态' }),
+  'cet-nonfinite': Object.assign({}, videoCatalog.xiaoyanNonfinite, { note: '晓艳老师讲解谓语与非谓语的区别' }),
+  'cet-relative': Object.assign({}, videoCatalog.rabbitClause, { page: 3, note: '形容词从句 / 定语从句' }),
+  'cet-nounclause': Object.assign({}, videoCatalog.rabbitClause, { page: 4, note: '主语从句、宾语从句、表语从句和同位语从句' }),
+  'cet-adverbial': Object.assign({}, videoCatalog.rabbitClause, { page: 9, note: '状语从句综述' }),
+  'cet-condition': Object.assign({}, videoCatalog.rabbitGrammar, { page: 5, note: '虚拟语气与条件表达' }),
+  'cet-modalperfect': Object.assign({}, videoCatalog.rabbitGrammar, { page: 8, note: '助动词、情态动词与推测' }),
+  'cet-inversion': Object.assign({}, videoCatalog.rabbitGrammar, { page: 25, note: '倒装与强调' }),
+  'cet-longsentence': Object.assign({}, videoCatalog.xiaoyanBasic, { page: 3, note: '英语句子基本结构与长难句拆分' })
+};
