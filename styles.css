@@ -361,3 +361,88 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .study-input-row input { flex: 1; min-width: 0; padding: 11px 12px; border: 1px solid rgba(255,255,255,.16); border-radius: 11px; background: rgba(255,255,255,.08); color: #fff; }
 .study-input-row input::placeholder { color: #aebcb4; }
 @media (max-width: 860px) { .level-switcher { display: none; } }
+/* Mobile adaptation */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, iframe, video, select, textarea, input { max-width: 100%; }
+@media (max-width: 860px) {
+  .mobile-header { position: sticky; top: 0; z-index: 50; margin: 0 -18px; padding: 0 18px; background: rgba(244,243,237,.96); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(227,230,223,.9); }
+  .main-content { padding-bottom: 42px; }
+  .view { width: 100%; }
+  .hero { margin-top: 12px; border-radius: 24px; }
+  .section-heading { margin-top: 30px; }
+  .lesson-content-grid, .reading-workspace, .settings-grid { gap: 14px; }
+  .reading-side { gap: 12px; }
+  .content-card, .settings-card, .article-paper, .study-panel, .review-panel { border-radius: 18px; }
+  .video-frame { border-radius: 12px; }
+}
+@media (max-width: 620px) {
+  .main-content { padding-left: 12px; padding-right: 12px; }
+  .mobile-header { margin-left: -12px; margin-right: -12px; padding-left: 12px; padding-right: 12px; }
+  .mobile-brand { font-size: 15px; }
+  .mobile-level-wrap select { max-width: 74px; padding: 7px 6px; }
+  .hero { padding: 25px 18px; }
+  .hero h1 { font-size: 34px; line-height: 1.12; }
+  .hero-copy > p { font-size: 14px; }
+  .hero-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .hero-actions button { width: 100%; padding-left: 10px; padding-right: 10px; }
+  .formula-card { padding: 20px 17px; border-radius: 18px; }
+  .formula-card > strong { font-size: 21px; }
+  .formula-card p { font-size: 16px; }
+  .stats-grid { gap: 10px; margin-bottom: 30px; }
+  .stat-card { padding: 15px; }
+  .today-card { min-height: 205px; padding: 20px; }
+  .today-card .primary-button, .today-card .secondary-button { left: 20px; bottom: 20px; }
+  .section-heading h2 { font-size: 25px; }
+  .page-heading h1 { font-size: 31px; }
+  .page-heading p { font-size: 13px; }
+  .filter-row { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .filter-button { flex: 0 0 auto; }
+  .lesson-card { min-height: 185px; padding: 18px; }
+  .lesson-detail-header { padding: 23px 18px; border-radius: 20px; }
+  .lesson-detail-header h1 { font-size: 31px; }
+  .content-card, .settings-card { padding: 18px; }
+  .rule-list li, .use-list li { padding: 10px 11px; }
+  .example-row { padding: 12px; }
+  .practice-question { padding: 15px 0; }
+  .option-button { min-height: 46px; padding: 11px 13px; font-size: 15px; }
+  .fill-input, .translation-input, .article-controls select, .settings-card input { font-size: 16px; }
+  .answer-feedback { font-size: 12px; }
+  .article-controls { margin: 18px 0; padding: 12px; gap: 10px; }
+  .article-paper { min-height: 0; padding: 22px 15px; }
+  .article-header h2 { font-size: 30px; line-height: 1.14; }
+  .article-meta { gap: 6px; }
+  .passage-paragraph { font-size: 18px; line-height: 1.82; }
+  .article-sentence { padding: 2px 1px; }
+  .word-token { padding: 1px 3px; }
+  .sentence-translation { font-size: 12px; }
+  .sentence-grammar { font-size: 11px; }
+  .article-toolbar { display: grid; grid-template-columns: 1fr 1fr; }
+  .article-toolbar button { width: 100%; }
+  .article-toolbar .primary-button { grid-column: auto; }
+  .reading-side { gap: 10px; }
+  .side-card { padding: 16px; }
+  .video-heading { flex-direction: column; }
+  .video-frame { margin-top: 12px; }
+  .video-frame.compact { margin: 10px 0; }
+  .vocabulary-list { grid-template-columns: 1fr; }
+  .vocab-card { padding: 16px; }
+  .study-panel, .review-panel { padding: 19px 16px; }
+  .review-word { font-size: 39px; overflow-wrap: anywhere; }
+  .study-option { min-height: 48px; padding: 12px 13px; font-size: 15px; }
+  .study-input-row { display: grid; grid-template-columns: 1fr; }
+  .study-input-row button { width: 100%; }
+  .page-actions { display: grid; grid-template-columns: 1fr; width: 100%; }
+  .page-actions button { width: 100%; }
+  .search-field { width: 100%; min-width: 0; }
+  .data-row { align-items: flex-start; }
+  .data-row button { flex: 0 0 auto; }
+  .word-drawer { max-height: 90vh; padding: 28px 18px; }
+  .drawer-word-row h2 { font-size: 36px; }
+  .drawer-actions { margin-top: 16px; }
+  .toast { bottom: 14px; width: calc(100% - 24px); text-align: center; }
+}
+@media (max-width: 390px) {
+  .hero-actions { grid-template-columns: 1fr; }
+  .article-toolbar { grid-template-columns: 1fr; }
+  .mobile-level-wrap select { max-width: 66px; font-size: 12px; }
+}
