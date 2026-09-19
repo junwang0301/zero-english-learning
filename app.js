@@ -984,11 +984,28 @@ function renderSentenceTools() {
   box.classList.remove('hidden');
   box.innerHTML = `<span class="eyebrow">已选句子</span><p class="selected-sentence">${escapeHtml(sentence.en)}</p><div class="drawer-actions"><button class="secondary-button" type="button" data-action="toggle-sentence-translation">${view.allTranslations || view.sentenceTranslations[index] ? '隐藏本句中文' : '显示本句中文'}</button><button class="secondary-button" type="button" data-action="toggle-sentence-grammar">${view.allGrammar || view.sentenceGrammar[index] ? '隐藏本句语法' : '显示本句语法'}</button></div>`;
 }
+function sentenceElementFromNode(node) {
+  const element = node && node.nodeType === 1 ? node : node && node.parentElement;
+  return element ? element.closest('[data-article-sentence]') : null;
+}
 function selectSentence(index) {
   state.selectedSentenceIndex = index;
   if (!state.currentArticle) return;
-  renderArticle(state.currentArticle);
+  $$('.article-sentence').forEach(element => element.classList.toggle('selected', Number(element.dataset.articleSentence) === index));
+  renderSentenceTools();
 }
+function selectSentenceFromMouse(event) {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+  const start = sentenceElementFromNode(selection.anchorNode);
+  const end = sentenceElementFromNode(selection.focusNode);
+  if (!start) return;
+  if (end && end !== start) return;
+  state.justSelectedText = true;
+  setTimeout(() => { state.justSelectedText = false; }, 0);
+  selectSentence(Number(start.dataset.articleSentence));
+}
+
 function toggleAllTranslations() {
   const view = articleViewState(state.currentArticle);
   view.allTranslations = !view.allTranslations;
@@ -1433,9 +1450,7 @@ async function handleClick(event) {
     return;
   }
   const wordButton = event.target.closest('[data-article-word]');
-  if (wordButton) { const sentenceIndex = Number(wordButton.dataset.sentenceIndex); selectSentence(sentenceIndex); openWordDrawer(wordButton.dataset.articleWord, sentenceIndex); return; }
-  const sentenceButton = event.target.closest('[data-article-sentence]');
-  if (sentenceButton) { selectSentence(Number(sentenceButton.dataset.articleSentence)); return; }
+  if (wordButton) { if (state.justSelectedText) return; openWordDrawer(wordButton.dataset.articleWord, Number(wordButton.dataset.sentenceIndex)); return; }
   const courseButton = event.target.closest('[data-course-id]');
   if (courseButton && courseButton.dataset.courseId) {
     const course = findCourse(courseButton.dataset.courseId);
@@ -1509,6 +1524,8 @@ function bindEvents() {
   $('#vocabSearch').addEventListener('input', renderVocabulary);
   $('#importFile').addEventListener('change', event => { const file = event.target.files[0]; if (file) importData(file); event.target.value = ''; });
   $('#wordDrawer').addEventListener('click', event => { if (event.target === $('#wordDrawer')) closeWordDrawer(); });
+  $('#articlePaper').addEventListener('mouseup', selectSentenceFromMouse);
+  $('#articlePaper').addEventListener('touchend', selectSentenceFromMouse);
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeWordDrawer(); $('#mobileNav').classList.add('hidden'); } });
 }
 function init() {
