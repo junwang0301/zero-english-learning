@@ -14,6 +14,12 @@
         <span class="brand-mark">En</span>
         <span><strong>英语起步课</strong><small>从语法开始读懂英语</small></span>
       </button>
+      <div class="level-switcher" aria-label="学习难度">
+        <span>学习难度</span>
+        <div class="level-buttons">
+          <button type="button" data-level="A1">A1</button><button type="button" data-level="A2">A2</button><button type="button" data-level="B1">B1</button><button type="button" data-level="CET4">四级</button>
+        </div>
+      </div>
       <nav class="nav-list">
         <button class="nav-item active" type="button" data-view="home"><span>⌂</span>学习首页</button>
         <button class="nav-item" type="button" data-view="grammar"><span>课</span>语法课堂</button>
@@ -32,14 +38,14 @@
     <main class="main-content">
       <header class="mobile-header">
         <button class="mobile-brand" type="button" data-view="home">英语起步课</button>
-        <button class="icon-button" type="button" data-action="open-mobile-nav" aria-label="打开菜单">☰</button>
+        <div class="mobile-level-wrap"><select id="mobileLevelSelect" aria-label="学习难度"><option value="A1">A1</option><option value="A2">A2</option><option value="B1">B1</option><option value="CET4">四级</option></select><button class="icon-button" type="button" data-action="open-mobile-nav" aria-label="打开菜单">☰</button></div>
       </header>
       <div id="mobileNav" class="mobile-nav hidden" aria-label="移动端导航"></div>
 
       <section id="view-home" class="view active" aria-labelledby="homeTitle">
         <div class="hero">
           <div class="hero-copy">
-            <span class="pill">零基础 → CET-4 路线</span>
+            <span class="pill" id="heroLevelLabel">零基础 → CET-4 路线</span>
             <h1 id="homeTitle">先把句子看懂，<br><em>再把英语用起来。</em></h1>
             <p>20 节基础语法课，配合目标语法文章阅读。遇到不会的词，点一下就能标注并加入单词本。</p>
             <div class="hero-actions">
@@ -138,8 +144,9 @@
             </div>
             <div class="side-card">
               <span class="eyebrow">标记说明</span>
-              <div class="legend"><i class="legend-dot cue"></i>目标语法 <i class="legend-dot marked"></i>已标注 <i class="legend-dot saved"></i>已入单词本</div>
+              <div class="legend"><span class="legend-item cue"><i class="legend-dot"></i>目标语法</span><span class="legend-item marked"><i class="legend-dot"></i>已标注</span><span class="legend-item saved"><i class="legend-dot"></i>已加入单词本</span></div>
             </div>
+            <div id="lessonVideoPanel" class="side-card hidden"></div>
             <div id="sentenceTools" class="side-card hidden">
               <span class="eyebrow">已选句子</span>
               <p class="selected-sentence"></p>
@@ -155,10 +162,12 @@
         <div class="page-heading">
           <div><span class="eyebrow">MY WORDS</span><h1 id="vocabularyTitle">我的单词本</h1><p>单词结合阅读原句记忆，系统会根据你的反馈安排下一次复习。</p></div>
           <div class="page-actions">
+            <button class="secondary-button" type="button" data-action="start-word-study">开始背单词</button>
             <button class="secondary-button" type="button" data-action="start-all-review">复习全部</button>
             <button class="primary-button" type="button" data-action="start-due-review">复习到期词</button>
           </div>
         </div>
+        <div id="studyPanel" class="study-panel hidden" aria-live="polite"></div>
         <div id="reviewPanel" class="review-panel hidden" aria-live="polite"></div>
         <div class="vocab-toolbar">
           <label class="search-field"><span>⌕</span><input id="vocabSearch" type="search" placeholder="搜索单词或释义"></label>
@@ -200,6 +209,7 @@
       <div class="definition-box"><span>释义</span><strong id="drawerMeaning">暂无释义</strong></div>
       <div class="context-box"><span>文章原句</span><p id="drawerContext"></p><small id="drawerContextZh"></small></div>
       <div id="drawerExample" class="example-line hidden"></div>
+      <div class="mnemonic-box"><span>单词助记</span><p id="drawerMnemonic"></p></div>
       <div class="drawer-actions">
         <button id="drawerMarkButton" class="secondary-button" type="button" data-action="toggle-word-mark">标注生词</button>
         <button id="drawerSaveButton" class="primary-button" type="button" data-action="toggle-word-save">加入单词本</button>
@@ -212,6 +222,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="loadingMask" class="loading-mask hidden" aria-live="polite"><div class="spinner"></div><strong id="loadingText">正在生成文章…</strong><span>通常需要几秒钟</span></div>
 
+  <script src="videos.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>
