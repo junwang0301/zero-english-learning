@@ -1522,6 +1522,23 @@ async function handleClick(event) {
 
 function bindEvents() {
   document.addEventListener('click', handleClick);
+  const mobileMenuButton = document.querySelector('[data-action="open-mobile-nav"]');
+  const mobileNav = $('#mobileNav');
+  if (mobileMenuButton && mobileNav) {
+    mobileMenuButton.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      mobileNav.classList.toggle('hidden');
+    });
+    mobileNav.addEventListener('click', event => {
+      const item = event.target.closest('[data-view]');
+      if (!item) return;
+      event.preventDefault();
+      event.stopPropagation();
+      showView(item.dataset.view);
+      mobileNav.classList.add('hidden');
+    });
+  }
   $('#articleControls').addEventListener('submit', event => { event.preventDefault(); generateArticle(); });
   $('#aiSettingsForm').addEventListener('submit', event => { event.preventDefault(); saveSettingsForm(); });
   $('#vocabSearch').addEventListener('input', renderVocabulary);
