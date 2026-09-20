@@ -1351,14 +1351,22 @@ function updateAIStatus() {
   badge.textContent = configured ? `AI 已配置 · ${state.settings.model}` : 'AI 未配置 · 本地模式';
   badge.className = 'status-badge ' + (configured ? 'ready' : 'neutral');
 }
-function loadSettingsForm() {
+function setApiKeyVisibility(visible) {
+  const input = $('#settingApiKey');
+  const button = $('#toggleApiKey');
+  if (!input || !button) return;
+  input.classList.toggle('secret-input-masked', !visible);
+  button.textContent = visible ? '隐藏' : '显示';
+  button.setAttribute('aria-pressed', String(visible));
+  button.setAttribute('aria-label', visible ? '隐藏 API Key' : '显示 API Key');
+}function loadSettingsForm() {
   $('#settingBaseUrl').value = state.settings.baseUrl || '';
   $('#settingModel').value = state.settings.model || '';
   $('#settingApiKey').value = state.settings.apiKey || '';
   updateAIStatus();
 }
 function saveSettingsForm() {
-  state.settings = { baseUrl: $('#settingBaseUrl').value.trim(), model: $('#settingModel').value.trim(), apiKey: $('#settingApiKey').value.trim() };
+  state.settings = Object.assign({}, state.settings, { baseUrl: $('#settingBaseUrl').value.trim(), model: $('#settingModel').value.trim(), apiKey: $('#settingApiKey').value.trim() });
   writeJSON(STORAGE.settings, state.settings);
   updateAIStatus();
   showToast(isAIConfigured() ? 'AI 设置已保存' : '设置已保存；填写完整后才会调用 AI');
@@ -1522,6 +1530,14 @@ async function handleClick(event) {
 
 function bindEvents() {
   document.addEventListener('click', handleClick);
+  const apiKeyToggle = $('#toggleApiKey');
+  if (apiKeyToggle) {
+    apiKeyToggle.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      setApiKeyVisibility($('#settingApiKey').classList.contains('secret-input-masked'));
+    });
+  }
   const mobileMenuButton = document.querySelector('[data-action="open-mobile-nav"]');
   const mobileNav = $('#mobileNav');
   if (mobileMenuButton && mobileNav) {
