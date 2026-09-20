@@ -501,3 +501,5 @@ img, iframe, video, select, textarea, input { max-width: 100%; }
 .partial-badge { display: inline-block; margin-left: 5px; padding: 2px 5px; border-radius: 999px; background: #fff0bd; color: #805a00; font-size: 10px; }
 .checkbox-row { display: flex !important; align-items: center; gap: 7px; margin-top: 7px; color: #80632a !important; font-size: 11px !important; font-weight: 700; }
 .checkbox-row input { width: auto !important; margin: 0; }
+.field-hint { color: #80632a; font-size: 11px; font-weight: 600; }
+.article-controls select:disabled { background: #eef1ed; color: #7b857e; cursor: not-allowed; }

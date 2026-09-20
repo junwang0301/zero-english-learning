@@ -507,6 +507,16 @@ function courseLevel(item) {
 function coursesForLevel(level = state.settings.level) {
   return courseItems().filter(item => courseLevel(item) === level);
 }
+function updateArticleTypeAvailability() {
+  const select = $('#articleType');
+  const hint = $('#articleTypeHint');
+  const enabled = (state.settings.level || 'A1') === 'CET4';
+  if (select) {
+    select.disabled = !enabled;
+    if (!enabled) select.value = 'careful';
+  }
+  if (hint) hint.classList.toggle('hidden', enabled);
+}
 function renderLevelSwitchers() {
   const level = state.settings.level || 'A1';
   $$('.level-switcher [data-level]').forEach(button => button.classList.toggle('active', button.dataset.level === level));
@@ -516,14 +526,18 @@ function renderLevelSwitchers() {
   if (articleLevel) articleLevel.value = level;
   const heroLabel = $('#heroLevelLabel');
   if (heroLabel) heroLabel.textContent = `${LEVEL_LABELS[level]} · 可随时切换`;
+  updateArticleTypeAvailability();
 }
 function setGlobalLevel(level) {
   if (!LEVEL_ORDER.includes(level)) return;
+  const previousLevel = state.settings.level;
   state.settings.level = level;
+  if (level === 'CET4' && previousLevel !== 'CET4' && $('#articleType')) $('#articleType').value = 'careful';
   writeJSON(STORAGE.settings, state.settings);
   renderLevelSwitchers();
   renderHome();
   renderGrammar();
+  updateArticleTypeAvailability();
   updateReadingVideo();
   showToast(`已切换到 ${LEVEL_LABELS[level]}`);
 }
@@ -1171,12 +1185,21 @@ function openSavedArticle(id) {
   const article = (state.articles || []).find(item => item.id === id);
   if (!article) return;
   state.currentArticle = article;
+  const articleLevel = LEVEL_ORDER.includes(article.level) ? article.level : (state.settings.level || 'A1');
+  if (state.settings.level !== articleLevel) {
+    state.settings.level = articleLevel;
+    writeJSON(STORAGE.settings, state.settings);
+  }
   if (findCourse(article.grammarId)) {
     populateArticleSelects();
+    renderLevelSwitchers();
     $('#articleGrammar').value = article.grammarId;
-    $('#articleLevel').value = article.level || state.settings.level || 'A1';
+    $('#articleLevel').value = articleLevel;
     $('#articleTopic').value = article.topicId || 'life';
-    if ($('#articleType') && article.articleType) $('#articleType').value = article.articleType;
+    if ($('#articleType')) {
+      $('#articleType').value = articleLevel === 'CET4' && ['wordBank', 'careful', 'long'].includes(article.articleType) ? article.articleType : 'careful';
+    }
+    updateArticleTypeAvailability();
   }
   renderArticle(article);
   updateReadingVideo();
@@ -1221,7 +1244,7 @@ function renderArticle(article) {
   const savedKeys = new Set(Object.keys(state.vocabulary));
   const marked = article.markedWords || {};
   const sourceLabel = article.partial ? 'AI 生成中' : (article.metadataPending ? 'AI 英文版' : (article.source === 'AI' ? 'AI 生成' : '本地文章'));
-  const typeLabel = ({ wordBank: '选词填空 · 200–250词', careful: '仔细阅读 · 300–350词', long: '长篇阅读 · 900–1000词' })[article.articleType] || '';
+  const typeLabel = article.level === 'CET4' ? ({ wordBank: '选词填空 · 200–250词', careful: '仔细阅读 · 300–350词', long: '长篇阅读 · 900–1000词' })[article.articleType] || '' : '等级默认';
   const coverageLabel = article.level === 'CET4' && article.cet4Coverage != null ? '四级词汇覆盖 ' + article.cet4Coverage + '%' : '';
   const paragraphs = [];
   article.sentences.forEach((sentence, sentenceIndex) => {
@@ -1473,7 +1496,8 @@ async function generateArticle() {
   const courseId = $('#articleGrammar').value;
   const level = $('#articleLevel').value;
   const topicId = $('#articleTopic').value;
-  const articleType = $('#articleType') ? $('#articleType').value : 'careful';
+  const selectedArticleType = $('#articleType') ? $('#articleType').value : 'careful';
+  const articleType = level === 'CET4' ? selectedArticleType : 'levelDefault';
   const course = findCourse(courseId);
   if (!course) return;
   if (state.articleGeneration) state.articleGeneration.controller.abort();
@@ -2021,7 +2045,7 @@ function selectAdvancedModule(id) {
   if (!module) return;
   populateArticleSelects();
   $('#articleGrammar').value = id;
-  $('#articleLevel').value = 'CET4';
+  setGlobalLevel('CET4');
   showView('reading');
   showToast(`已选择四级模块“${module.title}”，点击生成文章`);
 }
