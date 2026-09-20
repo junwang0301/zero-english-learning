@@ -906,9 +906,9 @@ function validateAIArticle(raw, course, level, topicId) {
   return { id: uid(), source: 'AI', level, grammarId: course.id, topicId, title: String(raw.title).trim(), titleZh: String(raw.titleZh || '').trim(), grammarFocus: String(raw.grammarFocus || course.title).trim(), sentences, vocabulary, markedWords: {}, viewState: { allTranslations: false, allGrammar: false, sentenceTranslations: {}, sentenceGrammar: {} }, createdAt: Date.now() };
 }function buildArticleMessages(course, level, topicId) {
   const topicNames = { life: '日常生活', school: '校园学习', family: '家庭朋友', travel: '旅行见闻', hobby: '兴趣爱好' };
-  const levelRules = { A1: '使用极简单句和最常见词汇，文章 100-140 词。', A2: '使用基础连接词和常见时态，文章 140-190 词。', B1: '使用自然连贯的段落和基础从句，文章 190-260 词。', CET4: '按大学英语四级阅读难度，使用常用学术与社会话题词汇、复杂句和逻辑连接，文章 280-380 词，但中文解释保持通俗。' };
+  const levelRules = { A1: '使用极简单句，文章 60-90 词。', A2: '使用基础连接词，文章 90-120 词。', B1: '使用自然段落和基础从句，文章 120-160 词。', CET4: '按大学英语四级阅读难度，文章 160-220 词，中文解释保持通俗。' };
   const system = `你是一名严谨的中国英语老师。你只为零基础到四级学习者写英语阅读。文章必须是完整、连贯的短文，不要写成逐句罗列或语法例句清单。只输出一个 JSON 对象，不要 Markdown 代码块。JSON 结构的字段顺序必须为：{"title":"英文标题","titleZh":"中文标题","grammarFocus":"语法重点","sentences":[{"en":"英文句子","zh":"准确中文翻译","grammarNote":"该句目标语法说明","paragraph":0}],"vocabulary":[{"word":"小写原词","phonetic":"音标可留空","meaningZh":"结合本文的中文释义","contextZh":"本句中文解释","example":"包含该词的英文例句"}]}。paragraph 从 0 开始表示第几段。`;
-  const user = `目标语法：${course.title}（${course.formula}）。\n难度：${level}。${levelRules[level] || levelRules.A1}\n主题：${topicNames[topicId] || '日常生活'}。\n写成 3-5 个自然段，每段 3-6 句，至少出现 5 次目标结构。所有句子按文章顺序放入 sentences 数组，不要逐句加标题或单独解释。词汇表覆盖主要实词。`;
+  const user = `目标语法：${course.title}（${course.formula}）。\n难度：${level}。${levelRules[level] || levelRules.A1}\n主题：${topicNames[topicId] || '日常生活'}。\n写成 2-4 个自然段，每段 2-4 句，至少出现 4 次目标结构。所有句子按文章顺序放入 sentences 数组，不要逐句加标题或单独解释。词汇表覆盖主要实词。`;
   return [{ role: 'system', content: system }, { role: 'user', content: user }];
 }
 function parseJsonStringValue(raw, key) {
@@ -979,7 +979,7 @@ async function callAIStream(messages, temperature, onDelta, externalSignal) {
   try {
     const response = await fetch(apiChatUrl(state.settings.baseUrl), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.settings.apiKey}` },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream', 'Authorization': `Bearer ${state.settings.apiKey}` },
       body: JSON.stringify({ model: state.settings.model, temperature, messages, stream: true }),
       signal: controller.signal
     });
@@ -1008,7 +1008,8 @@ async function callAIStream(messages, temperature, onDelta, externalSignal) {
         if (line === '[DONE]') continue;
         try {
           const data = JSON.parse(line);
-          let delta = data && data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content;
+          const choice = data && data.choices && data.choices[0];
+          let delta = choice && ((choice.delta && choice.delta.content) || choice.text);
           if (Array.isArray(delta)) delta = delta.map(item => item && item.text ? item.text : '').join('');
           if (typeof delta === 'string' && delta) { content += delta; onDelta(delta, content); }
         } catch (error) {}
@@ -1025,32 +1026,33 @@ async function generateAIArticle(course, level, topicId) {
   const content = await callAI(buildArticleMessages(course, level, topicId), 0.7);
   return validateAIArticle(extractJSON(content), course, level, topicId);
 }
-async function generateAIArticleStream(course, level, topicId, onPartial, signal) {
+async function generateAIArticleStream(course, level, topicId, onPartial, onProgress, signal) {
   const messages = buildArticleMessages(course, level, topicId);
+  const startedAt = Date.now();
+  let firstDeltaAt = 0;
   let full = '';
   let lastRenderLength = 0;
   let lastRenderTime = 0;
   try {
     full = await callAIStream(messages, 0.7, (delta, accumulated) => {
+      if (!firstDeltaAt) firstDeltaAt = Date.now();
+      onProgress({ mode: 'stream', chars: accumulated.length, firstDeltaMs: firstDeltaAt - startedAt });
       if (accumulated.length - lastRenderLength < 70 && Date.now() - lastRenderTime < 300) return;
       const partial = parsePartialArticle(accumulated, course, level, topicId);
       if (partial) { lastRenderLength = accumulated.length; lastRenderTime = Date.now(); onPartial(partial, false); }
     }, signal);
     const article = validateAIArticle(extractJSON(full), course, level, topicId);
-    return { article, streamed: true, partial: false };
+    return { article, streamed: true, partial: false, firstDeltaMs: firstDeltaAt ? firstDeltaAt - startedAt : 0 };
   } catch (error) {
     const partial = full ? parsePartialArticle(full, course, level, topicId) : null;
     if (error.name === 'AbortError') {
       if (partial) return { article: partial, streamed: true, partial: true, stopped: true };
       throw error;
     }
-    if (!full && !error.streamUnsupported) {
-      const content = await callAI(messages, 0.7);
-      return { article: validateAIArticle(extractJSON(content), course, level, topicId), streamed: false, partial: false };
-    }
+    onProgress({ mode: 'fallback', reason: error.message, chars: full.length });
     if (partial) return { article: partial, streamed: true, partial: true, error };
     const content = await callAI(messages, 0.7);
-    return { article: validateAIArticle(extractJSON(content), course, level, topicId), streamed: false, partial: false, fallback: true };
+    return { article: validateAIArticle(extractJSON(content), course, level, topicId), streamed: false, partial: false, fallback: true, error };
   }
 }
 const localClosingParagraphs = {
@@ -1236,6 +1238,30 @@ function stopArticleGeneration() {
     setGenerationStatus('已停止生成', { retry: true });
   }
 }
+function setGenerationStatus(message, options = {}) {
+  const box = $('#generationStatus');
+  if (!box) return;
+  box.classList.toggle('hidden', !message);
+  if (!message) return;
+  $('#generationStatusText').textContent = message;
+  $('#stopGenerationButton').classList.toggle('hidden', !options.stop);
+  $('#retryGenerationButton').classList.toggle('hidden', !options.retry);
+}
+function stopArticleGeneration() {
+  const generation = state.articleGeneration;
+  if (!generation) return;
+  generation.stopped = true;
+  generation.controller.abort();
+  setLoading(false);
+  if (generation.partial) {
+    generation.partial.partial = true;
+    saveArticle(generation.partial);
+    renderArticle(generation.partial);
+    setGenerationStatus('已停止生成，已保留当前内容', { retry: true });
+  } else {
+    setGenerationStatus('已停止生成', { retry: true });
+  }
+}
 async function generateArticle() {
   const courseId = $('#articleGrammar').value;
   const level = $('#articleLevel').value;
@@ -1250,6 +1276,12 @@ async function generateArticle() {
   $('#generateButtonLabel').textContent = '生成中…';
   let article = null;
   let complete = false;
+  let firstProgress = false;
+  const bufferTimer = setTimeout(() => {
+    if (state.articleGeneration !== generation || firstProgress) return;
+    setLoading(true, '服务商暂未返回流式内容，可能正在缓冲…');
+    setGenerationStatus('等待首个流式增量，服务商可能在缓冲响应…', { stop: true });
+  }, 3500);
   try {
     if (isAIConfigured()) {
       setLoading(true, '正在连接 AI…');
@@ -1257,18 +1289,38 @@ async function generateArticle() {
       const result = await generateAIArticleStream(course, level, topicId, partial => {
         if (state.articleGeneration !== generation) return;
         generation.partial = partial;
+        firstProgress = true;
+        clearTimeout(bufferTimer);
         setLoading(false);
-        setGenerationStatus(`正在生成，已收到 ${partial.sentences.length} 句…`, { stop: true });
+        setGenerationStatus(`流式生成中 · 已生成 ${partial.sentences.length} 句`, { stop: true });
         renderArticle(partial);
+      }, progress => {
+        if (state.articleGeneration !== generation) return;
+        firstProgress = true;
+        clearTimeout(bufferTimer);
+        if (progress.mode === 'fallback') {
+          setLoading(true, '服务商未返回流式内容，已自动回退普通请求…');
+          setGenerationStatus('服务商不支持流式，已回退普通请求', {});
+        } else {
+          setGenerationStatus(`流式接收中 · 首字 ${progress.firstDeltaMs}ms · ${progress.chars} 字符`, { stop: true });
+        }
       }, generation.controller.signal);
       if (state.articleGeneration !== generation) return;
       article = result.article;
       complete = !result.partial;
       setLoading(false);
-      if (result.partial) { article.partial = true; setGenerationStatus(generation.stopped ? '已停止生成，已保留当前内容' : '生成中断，已保留当前内容', { retry: true }); }
-      else { article.partial = false; setGenerationStatus(''); }
+      if (result.partial) {
+        article.partial = true;
+        setGenerationStatus(generation.stopped ? '已停止生成，已保留当前内容' : '生成中断，已保留当前内容', { retry: true });
+      } else {
+        article.partial = false;
+        setGenerationStatus('');
+        if (result.streamed) showToast(`流式生成完成 · 首字 ${result.firstDeltaMs || 0}ms`);
+      }
     } else {
-      article = createLocalArticle(course, level, topicId); complete = true; setGenerationStatus('');
+      article = createLocalArticle(course, level, topicId);
+      complete = true;
+      setGenerationStatus('');
       showToast('当前为本地模式，已生成模板文章');
     }
   } catch (error) {
@@ -1286,6 +1338,7 @@ async function generateArticle() {
       showToast('AI 生成失败，已回退本地文章'); console.warn('AI 文章生成失败', error);
     }
   } finally {
+    clearTimeout(bufferTimer);
     if (state.articleGeneration === generation) { button.disabled = false; $('#generateButtonLabel').textContent = '生成文章'; }
   }
   if (!article || state.articleGeneration !== generation) return;
