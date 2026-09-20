@@ -185,7 +185,7 @@
             <div class="card-heading"><span class="card-icon">AI</span><div><h2>文章生成设置</h2><p>支持 OpenAI 兼容的 Chat Completions 接口。</p></div></div>
             <label>接口地址<input id="settingBaseUrl" type="url" placeholder="https://api.openai.com/v1" autocomplete="off"></label>
             <label>模型名称<input id="settingModel" type="text" placeholder="填写你的服务商支持的模型名" autocomplete="off"></label>
-            <label>API Key<input id="settingApiKey" type="password" placeholder="sk-..." autocomplete="off"></label>
+            <label>API Key<span class="secret-input-wrap"><input id="settingApiKey" class="secret-input secret-input-masked" type="text" placeholder="sk-..." autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text" aria-label="API Key"><button id="toggleApiKey" class="secret-toggle" type="button" data-action="toggle-api-key" aria-pressed="false" aria-label="显示 API Key">显示</button></span></label>
             <p class="form-note">浏览器直连需要服务商允许 CORS。公开网站不要共用同一把 Key。</p>
             <div class="form-actions"><button class="primary-button" type="submit">保存设置</button><button class="secondary-button" type="button" data-action="clear-ai-settings">清空 Key</button></div>
           </form>
