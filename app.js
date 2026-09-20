@@ -9,7 +9,6 @@ const STORAGE = {
 };
 const DAY = 24 * 60 * 60 * 1000;
 const REVIEW_INTERVALS = [0, 1, 3, 7, 14, 30];
-const MAX_ARTICLES = 10;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -1068,10 +1067,46 @@ function createLocalArticle(course, level, topicId) {
   closing.forEach(item => { if (!sentences.some(sentence => sentence.en === item.en)) sentences.push(clone(item)); });
   sentences.forEach((sentence, index) => { if (sentence.paragraph == null) sentence.paragraph = Math.floor(index / 4); });
   return { id: uid(), source: 'LOCAL', level, grammarId: course.id, topicId, title: seed[0], titleZh: seed[1], grammarFocus: seed[2], sentences, vocabulary: buildVocabulary(sentences), markedWords: {}, viewState: { allTranslations: false, allGrammar: false, sentenceTranslations: {}, sentenceGrammar: {} }, createdAt: Date.now() };
-}function saveArticle(article) {
-  const existing = state.articles.filter(item => item.id !== article.id);
-  state.articles = [article].concat(existing).slice(0, MAX_ARTICLES);
+}function renderArticleHistory() {
+  const panel = $('#articleHistoryPanel');
+  if (!panel) return;
+  const articles = state.articles || [];
+  panel.innerHTML = `<div class="article-history-head"><h3>我的文章</h3><button class="card-menu-button" type="button" data-action="clear-article-history" ${articles.length ? '' : 'disabled'}>清空</button></div>${articles.length ? `<div class="article-history-list">${articles.map(article => `<div class="article-history-item"><button class="article-history-open" type="button" data-action="open-saved-article" data-article-id="${escapeHtml(article.id)}"><strong>${escapeHtml(article.title || '未命名文章')}${article.partial ? '<span class="partial-badge">未完成</span>' : ''}</strong><small>${escapeHtml(article.level || '')} · ${escapeHtml(article.grammarFocus || '')} · ${new Date(article.createdAt || Date.now()).toLocaleDateString('zh-CN')}</small></button><button class="article-history-delete" type="button" data-action="delete-saved-article" data-article-id="${escapeHtml(article.id)}">删除</button></div>`).join('')}</div>` : '<p class="article-history-empty">还没有已生成的文章。</p>'}`;
+}
+function openSavedArticle(id) {
+  const article = (state.articles || []).find(item => item.id === id);
+  if (!article) return;
+  state.currentArticle = article;
+  if (findCourse(article.grammarId)) {
+    populateArticleSelects();
+    $('#articleGrammar').value = article.grammarId;
+    $('#articleLevel').value = article.level || state.settings.level || 'A1';
+    $('#articleTopic').value = article.topicId || 'life';
+  }
+  renderArticle(article);
+  updateReadingVideo();
+  showView('reading');
+  $('#articlePaper').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function deleteSavedArticle(id) {
+  state.articles = (state.articles || []).filter(article => article.id !== id);
   writeJSON(STORAGE.articles, state.articles);
+  renderArticleHistory();
+  showToast('文章已删除');
+}
+function clearArticleHistory() {
+  if (!(state.articles || []).length) return;
+  if (!confirm('确定删除全部历史文章吗？此操作不可恢复。')) return;
+  state.articles = [];
+  writeJSON(STORAGE.articles, state.articles);
+  renderArticleHistory();
+  showToast('历史文章已清空');
+}
+function saveArticle(article) {
+  const existing = state.articles.filter(item => item.id !== article.id);
+  state.articles = [article].concat(existing);
+  writeJSON(STORAGE.articles, state.articles);
+  renderArticleHistory();
 }
 
 function tokenizeSentence(text) {
@@ -1412,8 +1447,9 @@ function persistCurrentArticle() {
   const index = state.articles.findIndex(item => item.id === state.currentArticle.id);
   if (index >= 0) state.articles[index] = state.currentArticle;
   else state.articles.unshift(state.currentArticle);
-  state.articles = state.articles.slice(0, MAX_ARTICLES);
+  state.articles = state.articles;
   writeJSON(STORAGE.articles, state.articles);
+  renderArticleHistory();
 }
 function toggleSelectedMark() {
   if (!state.selectedWord || !state.currentArticle) return;
@@ -1656,7 +1692,7 @@ function importData(file) {
       if (!confirm('导入将替换当前课程进度、生词本和文章记录，是否继续？')) return;
       state.progress = payload.progress;
       state.vocabulary = payload.vocabulary;
-      state.articles = payload.articles.slice(0, MAX_ARTICLES);
+      state.articles = payload.articles;
       if (payload.settings && payload.settings.baseUrl) state.settings.baseUrl = payload.settings.baseUrl;
       if (payload.settings && payload.settings.model) state.settings.model = payload.settings.model;
       writeJSON(STORAGE.progress, state.progress);
@@ -1705,6 +1741,7 @@ function renderAll() {
   renderHome();
   renderGrammar();
   renderVocabulary();
+  renderArticleHistory();
   loadSettingsForm();
   updateStats();
   if (state.currentArticle) renderArticle(state.currentArticle);
@@ -1790,6 +1827,9 @@ async function handleClick(event) {
   else if (action === 'import-data') $('#importFile').click();
   else if (action === 'clear-data') clearLearningData();
   else if (action === 'test-ai-connection') testAIConnection();
+  else if (action === 'open-saved-article') openSavedArticle(actionButton.dataset.articleId);
+  else if (action === 'delete-saved-article') deleteSavedArticle(actionButton.dataset.articleId);
+  else if (action === 'clear-article-history') clearArticleHistory();
   else if (action === 'clear-ai-settings') { state.settings.apiKey = ''; state.settings.connection = null; $('#settingApiKey').value = ''; $('#aiConnectionStatus').className = 'ai-connection-status hidden'; writeJSON(STORAGE.settings, state.settings); updateAIStatus(); showToast('API Key 已清空'); }
 }
 
