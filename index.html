@@ -197,7 +197,7 @@
           </form>
           <div class="settings-card">
             <div class="card-heading"><span class="card-icon">DB</span><div><h2>学习数据备份</h2><p>课程进度、生词本和文章记录都保存在本机。</p></div></div>
-            <div class="data-row"><div><strong>导出备份</strong><span>下载一个 JSON 文件</span></div><button class="secondary-button" type="button" data-action="export-data">导出</button></div>
+            <div class="data-row backup-export-row"><div><strong>导出备份</strong><span>下载一个 JSON 文件</span><label class="checkbox-row"><input id="exportApiKey" type="checkbox"><span>包含 API Key（明文，请勿分享）</span></label></div><button class="secondary-button" type="button" data-action="export-data">导出</button></div>
             <div class="data-row"><div><strong>导入备份</strong><span>导入前会校验并替换当前数据</span></div><button class="secondary-button" type="button" data-action="import-data">选择文件</button><input id="importFile" class="hidden" type="file" accept="application/json,.json"></div>
             <div class="data-row danger"><div><strong>清空学习数据</strong><span>课程进度和生词本将被删除</span></div><button class="danger-button" type="button" data-action="clear-data">清空</button></div>
           </div>
