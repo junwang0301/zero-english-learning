@@ -973,7 +973,7 @@ function parsePartialArticle(raw, course, level, topicId) {
   if (!sentences.length) return null;
   return { id: 'streaming-article', source: 'AI', partial: true, level, grammarId: course.id, topicId, title: String(title).trim(), titleZh: parseJsonStringValue(raw, 'titleZh').trim(), grammarFocus: parseJsonStringValue(raw, 'grammarFocus').trim() || course.title, sentences, vocabulary: buildVocabulary(sentences), markedWords: {}, viewState: { allTranslations: false, allGrammar: false, sentenceTranslations: {}, sentenceGrammar: {} }, createdAt: Date.now() };
 }
-async function callAIStream(messages, temperature, onDelta, externalSignal) {
+﻿async function callAIStream(messages, temperature, onDelta, externalSignal) {
   if (!isAIConfigured()) throw new Error('AI 尚未配置');
   const controller = new AbortController();
   const forwardAbort = () => controller.abort();
@@ -989,7 +989,6 @@ async function callAIStream(messages, temperature, onDelta, externalSignal) {
     if (!response.ok) {
       const raw = await response.text();
       const error = new Error(`AI 请求失败（${response.status}）：${raw.slice(0, 180)}`);
-      error.status = response.status;
       error.streamUnsupported = [400, 404, 405, 415, 422].includes(response.status);
       throw error;
     }
@@ -1023,15 +1022,23 @@ async function callAIStream(messages, temperature, onDelta, externalSignal) {
   } finally {
     clearTimeout(timeout);
     if (externalSignal) externalSignal.removeEventListener('abort', forwardAbort);
-    if (externalSignal) externalSignal.removeEventListener('abort', forwardAbort);
   }
 }
-function buildArticleTextMessages(course, level, topicId) {
-  const topicNames = { life: '日常生活', school: '校园学习', family: '家庭朋友', travel: '旅行见闻', hobby: '兴趣爱好' };
-  const levelRules = { A1: '60-90 个英文词', A2: '90-120 个英文词', B1: '120-160 个英文词', CET4: '160-220 个英文词' };
-  return [{ role: 'system', content: '你是英语老师。只输出纯文本，不要 JSON、Markdown、解释或额外标题。第一行是英文标题，第二行是中文标题，第三行留空，之后是 2-4 段连续英文正文。正文必须自然连贯。' }, { role: 'user', content: `目标语法：${course.title}（${course.formula}）。难度：${level}，全文 ${levelRules[level] || levelRules.A1}。主题：${topicNames[topicId] || '日常生活'}。至少自然出现 4 次目标结构。` }];
+function articleTypeSpec(articleType, level) {
+  if (level === 'CET4') return { wordBank: '200-250 词', careful: '300-350 词', long: '900-1000 词' }[articleType] || '300-350 词';
+  return { A1: '60-90 词', A2: '90-120 词', B1: '120-160 词' }[level] || '120-160 词';
 }
-function parsePlainArticle(raw, course, level, topicId) {
+function buildArticleTextMessages(course, level, topicId, articleType, chunk = null) {
+  const topicNames = { life: '日常生活', school: '校园学习', family: '家庭朋友', travel: '旅行见闻', hobby: '兴趣爱好' };
+  const difficulty = level === 'CET4' ? '大学英语四级阅读难度，接近 CEFR B1-B2，使用四级常用词汇、自然逻辑连接和考试常见主题，句子难度符合四级考试。' : '使用与当前等级匹配的词汇和句子。';
+  const length = articleTypeSpec(articleType, level);
+  if (articleType === 'long' && chunk) {
+    const first = chunk.index === 0;
+    return [{ role: 'system', content: `你是英语老师。${first ? '第一行英文标题，第二行中文标题，第三行留空，然后' : '只输出续写正文，不要重复标题，'}写第 ${chunk.index + 1}/${chunk.total} 段，约 300-330 个英文词。只输出纯文本。` }, { role: 'user', content: `目标语法：${course.title}。主题：${topicNames[topicId] || '日常生活'}。${difficulty}${chunk.tail ? `\n保持上下文连续。前文结尾：${chunk.tail}` : ''}` }];
+  }
+  return [{ role: 'system', content: '你是英语老师。只输出纯文本，不要 JSON、Markdown、解释或额外标题。第一行是英文标题，第二行是中文标题，第三行留空，之后是 2-4 段连续英文正文。正文必须自然连贯。' }, { role: 'user', content: `目标语法：${course.title}（${course.formula}）。难度：${level}，${difficulty}${level === 'CET4' ? `阅读题型：${articleType === 'wordBank' ? '四级选词填空文章' : articleType === 'long' ? '四级长篇阅读文章' : '四级仔细阅读文章'}，全文约 ${length}。` : `全文约 ${length}。`}主题：${topicNames[topicId] || '日常生活'}。至少自然出现 4 次目标结构。` }];
+}
+function parsePlainArticle(raw, course, level, topicId, articleType = 'careful') {
   const clean = String(raw || '').replace(/```(?:text|markdown)?/gi, '').replace(/```/g, '').trim();
   const lines = clean.split(/\r?\n/);
   let first = -1;
@@ -1052,50 +1059,89 @@ function parsePlainArticle(raw, course, level, topicId) {
     matches.map(item => item.trim()).filter(Boolean).forEach(en => sentences.push({ en, zh: '', grammarNote: '', paragraph: paragraphIndex }));
   });
   if (!sentences.length) return null;
-  return { id: uid(), source: 'AI', partial: false, metadataPending: true, level, grammarId: course.id, topicId, title, titleZh, grammarFocus: course.title, sentences, vocabulary: buildVocabulary(sentences), markedWords: {}, viewState: { allTranslations: false, allGrammar: false, sentenceTranslations: {}, sentenceGrammar: {} }, createdAt: Date.now() };
+  const article = { id: uid(), source: 'AI', partial: false, metadataPending: true, level, articleType, grammarId: course.id, topicId, title, titleZh, grammarFocus: course.title, sentences, vocabulary: buildVocabulary(sentences), markedWords: {}, viewState: { allTranslations: false, allGrammar: false, sentenceTranslations: {}, sentenceGrammar: {} }, createdAt: Date.now() };
+  return Object.assign(article, analyzeCET4Coverage(article));
 }
-function buildArticleMetadataMessages(article, course) {
-  const items = article.sentences.map((sentence, index) => ({ index, en: sentence.en }));
-  return [{ role: 'system', content: '你是英语老师。只输出 JSON，不要 Markdown。结构必须是：{"sentences":[{"index":0,"zh":"准确中文翻译","grammarNote":"该句语法说明"}]}。必须覆盖每个输入句子。' }, { role: 'user', content: `目标语法：${course.title}。请翻译并解释下列句子：\n${JSON.stringify(items)}` }];
+const CET4_IGNORED_WORDS = new Set(['the','a','an','and','or','but','is','are','was','were','be','been','being','am','do','does','did','have','has','had','can','could','will','would','should','may','might','must','to','of','in','on','at','for','from','with','without','by','as','it','this','that','these','those','i','you','he','she','we','they','my','your','his','her','our','their','me','him','us','them','not','no','yes','there','here','very','too','also','so','if','when','because','while','after','before','than','then','more','most','some','any','many','much','every','all','one','two','three','four','five','first','next','last']);
+function analyzeCET4Coverage(article) {
+  const basicWords = new Set(Object.keys(dictionary).map(normalizeWord));
+  const words = Array.from(new Set(article.sentences.flatMap(item => String(item.en || '').match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || []).map(word => normalizeWord(word)).filter(word => word && word.length > 2 && !CET4_IGNORED_WORDS.has(word) && !basicWords.has(word))));
+  const inList = words.filter(word => typeof CET4_WORDS !== 'undefined' && CET4_WORDS.has(word));
+  const outOfList = words.filter(word => !(typeof CET4_WORDS !== 'undefined' && CET4_WORDS.has(word)));
+  return { cet4Coverage: words.length ? Math.round(inList.length / words.length * 100) : 100, outOfList };
+}
+async function simplifyArticleForCET4(article, course, signal) {
+  const text = `${article.title}\n${article.titleZh}\n\n${article.sentences.map(item => item.en).join(' ')}`;
+  const messages = [{ role: 'system', content: '你是英语老师。请改成四级词汇覆盖至少95%的版本，保持题型、篇幅和原意。只输出纯文本，第一行英文标题，第二行中文标题，第三行留空，之后为正文。' }, { role: 'user', content: `需要避免或替换的超纲词：${article.outOfList.slice(0, 60).join(', ')}\n原文：\n${text}` }];
+  const content = await callAI(messages, 0.3, signal);
+  const revised = parsePlainArticle(content, course, article.level, article.topicId, article.articleType);
+  return revised && revised.cet4Coverage >= article.cet4Coverage ? revised : article;
+}
+function buildArticleMetadataMessages(article, course, indexes) {
+  const items = indexes.map(index => ({ index, en: article.sentences[index].en }));
+  return [{ role: 'system', content: '你是英语老师。只输出 JSON，不要 Markdown。结构必须是：{"sentences":[{"index":0,"zh":"准确中文翻译","grammarNote":"该句语法说明"}]}。必须覆盖每个输入句子。' }, { role: 'user', content: `目标语法：${course.title}。翻译并解释这些句子：\n${JSON.stringify(items)}` }];
 }
 async function enrichArticleWithAI(article, course, signal) {
-  const content = await callAI(buildArticleMetadataMessages(article, course), 0.2, signal);
-  const parsed = extractJSON(content);
-  if (!parsed || !Array.isArray(parsed.sentences)) throw new Error('翻译与语法返回格式错误');
-  const map = new Map(parsed.sentences.map(item => [Number(item.index), item]));
+  const merged = new Map();
+  for (let start = 0; start < article.sentences.length; start += 10) {
+    const indexes = article.sentences.map((_, index) => index).slice(start, start + 10);
+    const content = await callAI(buildArticleMetadataMessages(article, course, indexes), 0.2, signal);
+    const parsed = extractJSON(content);
+    if (!parsed || !Array.isArray(parsed.sentences)) throw new Error('翻译与语法返回格式错误');
+    parsed.sentences.forEach(item => merged.set(Number(item.index), item));
+  }
   article.sentences = article.sentences.map((sentence, index) => {
-    const item = map.get(index) || {};
+    const item = merged.get(index) || {};
     return Object.assign({}, sentence, { zh: String(item.zh || '').trim(), grammarNote: String(item.grammarNote || '').trim() });
   });
   article.metadataPending = false;
   article.partial = false;
   return article;
 }
-async function generateAIArticleTextStream(course, level, topicId, onPartial, onProgress, signal) {
-  const messages = buildArticleTextMessages(course, level, topicId);
+async function generateAIArticleTextStream(course, level, topicId, articleType, onPartial, onProgress, signal) {
   const startedAt = Date.now();
   let firstDeltaAt = 0;
   let full = '';
   try {
-    full = await callAIStream(messages, 0.55, (delta, accumulated) => {
-      if (!firstDeltaAt) firstDeltaAt = Date.now();
-      onProgress({ mode: 'stream', chars: accumulated.length, firstDeltaMs: firstDeltaAt - startedAt });
-      const article = parsePlainArticle(accumulated, course, level, topicId);
-      if (article) onPartial(article, false);
-    }, signal);
-    const article = parsePlainArticle(full, course, level, topicId);
+    if (articleType === 'long' && level === 'CET4') {
+      for (let chunkIndex = 0; chunkIndex < 3; chunkIndex++) {
+        const tail = full.slice(-700);
+        const messages = buildArticleTextMessages(course, level, topicId, articleType, { index: chunkIndex, total: 3, tail });
+        const chunkText = await callAIStream(messages, 0.5, (delta, accumulated) => {
+          if (!firstDeltaAt) firstDeltaAt = Date.now();
+          onProgress({ mode: 'stream', chars: full.length + accumulated.length, firstDeltaMs: firstDeltaAt - startedAt, chunk: chunkIndex + 1, chunks: 3 });
+          const combined = full + (full ? '\n\n' : '') + accumulated;
+          const article = parsePlainArticle(combined, course, level, topicId, articleType);
+          if (article) onPartial(article, false);
+        }, signal);
+        full += (full ? '\n\n' : '') + chunkText.trim();
+      }
+    } else {
+      const messages = buildArticleTextMessages(course, level, topicId, articleType);
+      full = await callAIStream(messages, 0.5, (delta, accumulated) => {
+        if (!firstDeltaAt) firstDeltaAt = Date.now();
+        onProgress({ mode: 'stream', chars: accumulated.length, firstDeltaMs: firstDeltaAt - startedAt });
+        const article = parsePlainArticle(accumulated, course, level, topicId, articleType);
+        if (article) onPartial(article, false);
+      }, signal);
+    }
+    let article = parsePlainArticle(full, course, level, topicId, articleType);
     if (!article) throw new Error('文章正文格式不完整');
+    if (level === 'CET4' && article.cet4Coverage < 95) {
+      onProgress({ mode: 'stream', chars: full.length, firstDeltaMs: firstDeltaAt ? firstDeltaAt - startedAt : 0, refiningVocabulary: true });
+      article = await simplifyArticleForCET4(article, course, signal);
+    }
     return { article, streamed: true, firstDeltaMs: firstDeltaAt ? firstDeltaAt - startedAt : 0 };
   } catch (error) {
-    const article = full ? parsePlainArticle(full, course, level, topicId) : null;
+    const article = full ? parsePlainArticle(full, course, level, topicId, articleType) : null;
     if (error.name === 'AbortError') {
       if (article) return { article, streamed: true, partial: true, stopped: true };
       throw error;
     }
     onProgress({ mode: 'fallback', reason: error.message, chars: full.length });
     if (article) return { article, streamed: true, partial: true, error };
-    const content = await callAI(messages, 0.55, signal);
-    const fallbackArticle = parsePlainArticle(content, course, level, topicId);
+    const content = await callAI(buildArticleTextMessages(course, level, topicId, articleType), 0.5, signal);
+    const fallbackArticle = parsePlainArticle(content, course, level, topicId, articleType);
     if (!fallbackArticle) throw new Error('普通请求返回的文章格式不完整');
     return { article: fallbackArticle, streamed: false, fallback: true, error };
   }
@@ -1130,6 +1176,7 @@ function openSavedArticle(id) {
     $('#articleGrammar').value = article.grammarId;
     $('#articleLevel').value = article.level || state.settings.level || 'A1';
     $('#articleTopic').value = article.topicId || 'life';
+    if ($('#articleType') && article.articleType) $('#articleType').value = article.articleType;
   }
   renderArticle(article);
   updateReadingVideo();
@@ -1173,7 +1220,9 @@ function renderArticle(article) {
   const cueSet = new Set((course.cues || []).map(word => word.toLowerCase()));
   const savedKeys = new Set(Object.keys(state.vocabulary));
   const marked = article.markedWords || {};
-  const sourceLabel = article.partial ? 'AI 生成中' : (article.source === 'AI' ? 'AI 生成' : '本地文章');
+  const sourceLabel = article.partial ? 'AI 生成中' : (article.metadataPending ? 'AI 英文版' : (article.source === 'AI' ? 'AI 生成' : '本地文章'));
+  const typeLabel = ({ wordBank: '选词填空 · 200–250词', careful: '仔细阅读 · 300–350词', long: '长篇阅读 · 900–1000词' })[article.articleType] || '';
+  const coverageLabel = article.level === 'CET4' && article.cet4Coverage != null ? '四级词汇覆盖 ' + article.cet4Coverage + '%' : '';
   const paragraphs = [];
   article.sentences.forEach((sentence, sentenceIndex) => {
     const paragraphIndex = Number.isInteger(sentence.paragraph) ? sentence.paragraph : Math.floor(sentenceIndex / 3);
@@ -1197,7 +1246,7 @@ function renderArticle(article) {
   }).join(' ')}</p>`).join('');
   const totalWords = article.sentences.reduce((sum, sentence) => sum + (sentence.en.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || []).length, 0);
   $('#articleWordCount').textContent = `${totalWords} 个词`;
-  $('#articlePaper').innerHTML = `<header class="article-header"><span class="eyebrow">${escapeHtml(article.level)} · ${sourceLabel}</span><h2>${escapeHtml(article.title)}</h2><div class="article-zh-title ${view.allTranslations ? '' : 'hidden'}">${escapeHtml(article.titleZh || '')}</div><div class="article-meta"><span>目标语法：${escapeHtml(article.grammarFocus || course.title)}</span><span>${article.sentences.length} 句 · ${paragraphs.length} 段</span><span>点击单词查词典，点击句子单独切换</span></div></header><div class="article-body">${body}</div><div class="article-toolbar"><button class="secondary-button" type="button" data-action="toggle-all-translations">${view.allTranslations ? '隐藏全文中文' : '显示全文中文'}</button><button class="secondary-button" type="button" data-action="toggle-all-grammar">${view.allGrammar ? '隐藏全部语法' : '显示全部语法'}</button>${article.metadataPending ? '<button class="secondary-button" type="button" data-action="enrich-article">补充翻译和语法</button>' : ''}<button class="primary-button" type="button" data-action="regenerate-article">换一篇</button><button class="text-button" type="button" data-action="open-reading-settings">调整生成条件</button></div>`;
+  $('#articlePaper').innerHTML = `<header class="article-header"><span class="eyebrow">${escapeHtml(article.level)} · ${sourceLabel}</span><h2>${escapeHtml(article.title)}</h2><div class="article-zh-title ${view.allTranslations ? '' : 'hidden'}">${escapeHtml(article.titleZh || '')}</div><div class="article-meta"><span>目标语法：${escapeHtml(article.grammarFocus || course.title)}</span><span>${article.sentences.length} 句 · ${paragraphs.length} 段</span>${typeLabel ? `<span>${typeLabel}</span>` : ''}${coverageLabel ? `<span>${coverageLabel}</span>` : ''}<span>点击单词查词典，点击句子单独切换</span></div></header><div class="article-body">${body}</div><div class="article-toolbar"><button class="secondary-button" type="button" data-action="toggle-all-translations">${view.allTranslations ? '隐藏全文中文' : '显示全文中文'}</button><button class="secondary-button" type="button" data-action="toggle-all-grammar">${view.allGrammar ? '隐藏全部语法' : '显示全部语法'}</button>${article.metadataPending ? '<button class="secondary-button" type="button" data-action="enrich-article">补充翻译和语法</button>' : ''}<button class="primary-button" type="button" data-action="regenerate-article">换一篇</button><button class="text-button" type="button" data-action="open-reading-settings">调整生成条件</button></div>`;
   renderSentenceTools();
 }
 function renderSentenceTools() {
@@ -1376,10 +1425,55 @@ async function enrichCurrentArticle() {
     showToast('补充失败：' + error.message);
   } finally { setLoading(false); }
 }
+﻿function setGenerationStatus(message, options = {}) {
+  const box = $('#generationStatus');
+  if (!box) return;
+  box.classList.toggle('hidden', !message);
+  if (!message) return;
+  $('#generationStatusText').textContent = message;
+  $('#stopGenerationButton').classList.toggle('hidden', !options.stop);
+  $('#retryGenerationButton').classList.toggle('hidden', !options.retry);
+}
+function stopArticleGeneration() {
+  const generation = state.articleGeneration;
+  if (!generation) return;
+  generation.stopped = true;
+  generation.controller.abort();
+  setLoading(false);
+  if (generation.partial) {
+    generation.partial.partial = true;
+    saveArticle(generation.partial);
+    renderArticle(generation.partial);
+    setGenerationStatus('已停止生成，已保留当前内容', { retry: true });
+  } else {
+    setGenerationStatus('已停止生成', { retry: true });
+  }
+}
+async function enrichCurrentArticle() {
+  const article = state.currentArticle;
+  if (!article || !article.metadataPending) return;
+  const course = findCourse(article.grammarId);
+  if (!course) return;
+  setLoading(true, '正在补充中文翻译和语法说明…');
+  try {
+    await enrichArticleWithAI(article, course);
+    saveArticle(article);
+    renderArticle(article);
+    setGenerationStatus('');
+    showToast('中文翻译和语法说明已补齐');
+  } catch (error) {
+    article.metadataPending = true;
+    saveArticle(article);
+    renderArticle(article);
+    setGenerationStatus('翻译或语法暂时未补齐，可稍后重试', { retry: true });
+    showToast('补充失败：' + error.message);
+  } finally { setLoading(false); }
+}
 async function generateArticle() {
   const courseId = $('#articleGrammar').value;
   const level = $('#articleLevel').value;
   const topicId = $('#articleTopic').value;
+  const articleType = $('#articleType') ? $('#articleType').value : 'careful';
   const course = findCourse(courseId);
   if (!course) return;
   if (state.articleGeneration) state.articleGeneration.controller.abort();
@@ -1400,7 +1494,7 @@ async function generateArticle() {
     if (isAIConfigured()) {
       setLoading(true, '正在连接 AI…');
       setGenerationStatus('等待 AI 响应…', { stop: true });
-      const result = await generateAIArticleTextStream(course, level, topicId, partial => {
+      const result = await generateAIArticleTextStream(course, level, topicId, articleType, partial => {
         if (state.articleGeneration !== generation) return;
         generation.partial = partial;
         firstProgress = true;
@@ -1416,7 +1510,7 @@ async function generateArticle() {
           setLoading(true, '服务商未返回流式内容，已自动回退普通请求…');
           setGenerationStatus('服务商不支持流式，已回退普通请求', {});
         } else {
-          setGenerationStatus(`流式接收中 · 首字 ${progress.firstDeltaMs}ms · ${progress.chars} 字符`, { stop: true });
+          setGenerationStatus(progress.refiningVocabulary ? '四级词汇覆盖率不足，正在自动简化…' : `流式接收中${progress.chunk ? ` · 第 ${progress.chunk}/${progress.chunks} 段` : ''} · 首字 ${progress.firstDeltaMs}ms · ${progress.chars} 字符`, { stop: true });
         }
       }, generation.controller.signal);
       if (state.articleGeneration !== generation) return;
@@ -1445,6 +1539,7 @@ async function generateArticle() {
       }
     } else {
       article = createLocalArticle(course, level, topicId);
+      article.articleType = articleType;
       complete = true;
       setGenerationStatus('');
       showToast('当前为本地模式，已生成模板文章');
