@@ -838,9 +838,11 @@ function extractJSON(text) {
     throw new Error('AI 未返回有效 JSON');
   }
 }
-async function callAI(messages, temperature = 0.5) {
+async function callAI(messages, temperature = 0.5, externalSignal = null) {
   if (!isAIConfigured()) throw new Error('AI 尚未配置');
   const controller = new AbortController();
+  const forwardAbort = () => controller.abort();
+  if (externalSignal) externalSignal.addEventListener('abort', forwardAbort, { once: true });
   const timeout = setTimeout(() => controller.abort(), 60000);
   try {
     const response = await fetch(apiChatUrl(state.settings.baseUrl), {
@@ -860,6 +862,7 @@ async function callAI(messages, temperature = 0.5) {
     throw error;
   } finally {
     clearTimeout(timeout);
+    if (externalSignal) externalSignal.removeEventListener('abort', forwardAbort);
   }
 }
 async function gradeLessonWithAI(lesson) {
@@ -1020,41 +1023,84 @@ async function callAIStream(messages, temperature, onDelta, externalSignal) {
   } finally {
     clearTimeout(timeout);
     if (externalSignal) externalSignal.removeEventListener('abort', forwardAbort);
+    if (externalSignal) externalSignal.removeEventListener('abort', forwardAbort);
   }
 }
-async function generateAIArticle(course, level, topicId) {
-  const content = await callAI(buildArticleMessages(course, level, topicId), 0.7);
-  return validateAIArticle(extractJSON(content), course, level, topicId);
+function buildArticleTextMessages(course, level, topicId) {
+  const topicNames = { life: '日常生活', school: '校园学习', family: '家庭朋友', travel: '旅行见闻', hobby: '兴趣爱好' };
+  const levelRules = { A1: '60-90 个英文词', A2: '90-120 个英文词', B1: '120-160 个英文词', CET4: '160-220 个英文词' };
+  return [{ role: 'system', content: '你是英语老师。只输出纯文本，不要 JSON、Markdown、解释或额外标题。第一行是英文标题，第二行是中文标题，第三行留空，之后是 2-4 段连续英文正文。正文必须自然连贯。' }, { role: 'user', content: `目标语法：${course.title}（${course.formula}）。难度：${level}，全文 ${levelRules[level] || levelRules.A1}。主题：${topicNames[topicId] || '日常生活'}。至少自然出现 4 次目标结构。` }];
 }
-async function generateAIArticleStream(course, level, topicId, onPartial, onProgress, signal) {
-  const messages = buildArticleMessages(course, level, topicId);
+function parsePlainArticle(raw, course, level, topicId) {
+  const clean = String(raw || '').replace(/```(?:text|markdown)?/gi, '').replace(/```/g, '').trim();
+  const lines = clean.split(/\r?\n/);
+  let first = -1;
+  let second = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() && first < 0) { first = i; continue; }
+    if (first >= 0 && lines[i].trim() && second < 0) { second = i; break; }
+  }
+  if (first < 0 || second < 0) return null;
+  const title = lines[first].trim().replace(/^#+\s*/, '').replace(/^\*\*|\*\*$/g, '');
+  const titleZh = lines[second].trim().replace(/^#+\s*/, '').replace(/^\*\*|\*\*$/g, '');
+  const body = lines.slice(second + 1).join('\n').trim();
+  if (!body) return null;
+  const paragraphs = body.split(/\n\s*\n/).map(item => item.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean);
+  const sentences = [];
+  paragraphs.forEach((paragraph, paragraphIndex) => {
+    const matches = paragraph.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+    matches.map(item => item.trim()).filter(Boolean).forEach(en => sentences.push({ en, zh: '', grammarNote: '', paragraph: paragraphIndex }));
+  });
+  if (!sentences.length) return null;
+  return { id: uid(), source: 'AI', partial: false, metadataPending: true, level, grammarId: course.id, topicId, title, titleZh, grammarFocus: course.title, sentences, vocabulary: buildVocabulary(sentences), markedWords: {}, viewState: { allTranslations: false, allGrammar: false, sentenceTranslations: {}, sentenceGrammar: {} }, createdAt: Date.now() };
+}
+function buildArticleMetadataMessages(article, course) {
+  const items = article.sentences.map((sentence, index) => ({ index, en: sentence.en }));
+  return [{ role: 'system', content: '你是英语老师。只输出 JSON，不要 Markdown。结构必须是：{"sentences":[{"index":0,"zh":"准确中文翻译","grammarNote":"该句语法说明"}]}。必须覆盖每个输入句子。' }, { role: 'user', content: `目标语法：${course.title}。请翻译并解释下列句子：\n${JSON.stringify(items)}` }];
+}
+async function enrichArticleWithAI(article, course, signal) {
+  const content = await callAI(buildArticleMetadataMessages(article, course), 0.2, signal);
+  const parsed = extractJSON(content);
+  if (!parsed || !Array.isArray(parsed.sentences)) throw new Error('翻译与语法返回格式错误');
+  const map = new Map(parsed.sentences.map(item => [Number(item.index), item]));
+  article.sentences = article.sentences.map((sentence, index) => {
+    const item = map.get(index) || {};
+    return Object.assign({}, sentence, { zh: String(item.zh || '').trim(), grammarNote: String(item.grammarNote || '').trim() });
+  });
+  article.metadataPending = false;
+  article.partial = false;
+  return article;
+}
+async function generateAIArticleTextStream(course, level, topicId, onPartial, onProgress, signal) {
+  const messages = buildArticleTextMessages(course, level, topicId);
   const startedAt = Date.now();
   let firstDeltaAt = 0;
   let full = '';
-  let lastRenderLength = 0;
-  let lastRenderTime = 0;
   try {
-    full = await callAIStream(messages, 0.7, (delta, accumulated) => {
+    full = await callAIStream(messages, 0.55, (delta, accumulated) => {
       if (!firstDeltaAt) firstDeltaAt = Date.now();
       onProgress({ mode: 'stream', chars: accumulated.length, firstDeltaMs: firstDeltaAt - startedAt });
-      if (accumulated.length - lastRenderLength < 70 && Date.now() - lastRenderTime < 300) return;
-      const partial = parsePartialArticle(accumulated, course, level, topicId);
-      if (partial) { lastRenderLength = accumulated.length; lastRenderTime = Date.now(); onPartial(partial, false); }
+      const article = parsePlainArticle(accumulated, course, level, topicId);
+      if (article) onPartial(article, false);
     }, signal);
-    const article = validateAIArticle(extractJSON(full), course, level, topicId);
-    return { article, streamed: true, partial: false, firstDeltaMs: firstDeltaAt ? firstDeltaAt - startedAt : 0 };
+    const article = parsePlainArticle(full, course, level, topicId);
+    if (!article) throw new Error('文章正文格式不完整');
+    return { article, streamed: true, firstDeltaMs: firstDeltaAt ? firstDeltaAt - startedAt : 0 };
   } catch (error) {
-    const partial = full ? parsePartialArticle(full, course, level, topicId) : null;
+    const article = full ? parsePlainArticle(full, course, level, topicId) : null;
     if (error.name === 'AbortError') {
-      if (partial) return { article: partial, streamed: true, partial: true, stopped: true };
+      if (article) return { article, streamed: true, partial: true, stopped: true };
       throw error;
     }
     onProgress({ mode: 'fallback', reason: error.message, chars: full.length });
-    if (partial) return { article: partial, streamed: true, partial: true, error };
-    const content = await callAI(messages, 0.7);
-    return { article: validateAIArticle(extractJSON(content), course, level, topicId), streamed: false, partial: false, fallback: true, error };
+    if (article) return { article, streamed: true, partial: true, error };
+    const content = await callAI(messages, 0.55, signal);
+    const fallbackArticle = parsePlainArticle(content, course, level, topicId);
+    if (!fallbackArticle) throw new Error('普通请求返回的文章格式不完整');
+    return { article: fallbackArticle, streamed: false, fallback: true, error };
   }
 }
+
 const localClosingParagraphs = {
   life: [articleSentence('Life is not always easy, but small routines can make it better.', '生活并不总是容易，但小的日常习惯可以让它变得更好。', '一般现在时'), articleSentence('I try to keep my room clean and my mind calm.', '我尽量保持房间整洁、内心平静。', '一般现在时'), articleSentence('At the end of the day, I write down one thing I learned.', '一天结束时，我会写下自己学到的一件事。', '一般现在时'), articleSentence('This simple habit helps me notice progress.', '这个简单习惯帮助我注意到进步。', '一般现在时')],
   school: [articleSentence('Our teacher often asks us to explain ideas in our own words.', '老师经常要求我们用自己的话解释观点。', '一般现在时'), articleSentence('This makes the lesson more active and useful.', '这让课堂更活跃、更有用。', '一般现在时'), articleSentence('After class, we compare notes and help each other.', '课后我们会对照笔记并互相帮助。', '一般现在时'), articleSentence('Little by little, difficult subjects become easier to understand.', '渐渐地，困难的科目变得更容易理解。', '一般现在时')],
@@ -1073,7 +1119,7 @@ function createLocalArticle(course, level, topicId) {
   const panel = $('#articleHistoryPanel');
   if (!panel) return;
   const articles = state.articles || [];
-  panel.innerHTML = `<div class="article-history-head"><h3>我的文章</h3><button class="card-menu-button" type="button" data-action="clear-article-history" ${articles.length ? '' : 'disabled'}>清空</button></div>${articles.length ? `<div class="article-history-list">${articles.map(article => `<div class="article-history-item"><button class="article-history-open" type="button" data-action="open-saved-article" data-article-id="${escapeHtml(article.id)}"><strong>${escapeHtml(article.title || '未命名文章')}${article.partial ? '<span class="partial-badge">未完成</span>' : ''}</strong><small>${escapeHtml(article.level || '')} · ${escapeHtml(article.grammarFocus || '')} · ${new Date(article.createdAt || Date.now()).toLocaleDateString('zh-CN')}</small></button><button class="article-history-delete" type="button" data-action="delete-saved-article" data-article-id="${escapeHtml(article.id)}">删除</button></div>`).join('')}</div>` : '<p class="article-history-empty">还没有已生成的文章。</p>'}`;
+  panel.innerHTML = `<div class="article-history-head"><h3>我的文章</h3><button class="card-menu-button" type="button" data-action="clear-article-history" ${articles.length ? '' : 'disabled'}>清空</button></div>${articles.length ? `<div class="article-history-list">${articles.map(article => `<div class="article-history-item"><button class="article-history-open" type="button" data-action="open-saved-article" data-article-id="${escapeHtml(article.id)}"><strong>${escapeHtml(article.title || '未命名文章')}${article.partial ? '<span class="partial-badge">未完成</span>' : (article.metadataPending ? '<span class="partial-badge">待补齐</span>' : '')}</strong><small>${escapeHtml(article.level || '')} · ${escapeHtml(article.grammarFocus || '')} · ${new Date(article.createdAt || Date.now()).toLocaleDateString('zh-CN')}</small></button><button class="article-history-delete" type="button" data-action="delete-saved-article" data-article-id="${escapeHtml(article.id)}">删除</button></div>`).join('')}</div>` : '<p class="article-history-empty">还没有已生成的文章。</p>'}`;
 }
 function openSavedArticle(id) {
   const article = (state.articles || []).find(item => item.id === id);
@@ -1151,7 +1197,7 @@ function renderArticle(article) {
   }).join(' ')}</p>`).join('');
   const totalWords = article.sentences.reduce((sum, sentence) => sum + (sentence.en.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || []).length, 0);
   $('#articleWordCount').textContent = `${totalWords} 个词`;
-  $('#articlePaper').innerHTML = `<header class="article-header"><span class="eyebrow">${escapeHtml(article.level)} · ${sourceLabel}</span><h2>${escapeHtml(article.title)}</h2><div class="article-zh-title ${view.allTranslations ? '' : 'hidden'}">${escapeHtml(article.titleZh || '')}</div><div class="article-meta"><span>目标语法：${escapeHtml(article.grammarFocus || course.title)}</span><span>${article.sentences.length} 句 · ${paragraphs.length} 段</span><span>点击单词查词典，点击句子单独切换</span></div></header><div class="article-body">${body}</div><div class="article-toolbar"><button class="secondary-button" type="button" data-action="toggle-all-translations">${view.allTranslations ? '隐藏全文中文' : '显示全文中文'}</button><button class="secondary-button" type="button" data-action="toggle-all-grammar">${view.allGrammar ? '隐藏全部语法' : '显示全部语法'}</button><button class="primary-button" type="button" data-action="regenerate-article">换一篇</button><button class="text-button" type="button" data-action="open-reading-settings">调整生成条件</button></div>`;
+  $('#articlePaper').innerHTML = `<header class="article-header"><span class="eyebrow">${escapeHtml(article.level)} · ${sourceLabel}</span><h2>${escapeHtml(article.title)}</h2><div class="article-zh-title ${view.allTranslations ? '' : 'hidden'}">${escapeHtml(article.titleZh || '')}</div><div class="article-meta"><span>目标语法：${escapeHtml(article.grammarFocus || course.title)}</span><span>${article.sentences.length} 句 · ${paragraphs.length} 段</span><span>点击单词查词典，点击句子单独切换</span></div></header><div class="article-body">${body}</div><div class="article-toolbar"><button class="secondary-button" type="button" data-action="toggle-all-translations">${view.allTranslations ? '隐藏全文中文' : '显示全文中文'}</button><button class="secondary-button" type="button" data-action="toggle-all-grammar">${view.allGrammar ? '隐藏全部语法' : '显示全部语法'}</button>${article.metadataPending ? '<button class="secondary-button" type="button" data-action="enrich-article">补充翻译和语法</button>' : ''}<button class="primary-button" type="button" data-action="regenerate-article">换一篇</button><button class="text-button" type="button" data-action="open-reading-settings">调整生成条件</button></div>`;
   renderSentenceTools();
 }
 function renderSentenceTools() {
@@ -1262,6 +1308,74 @@ function stopArticleGeneration() {
     setGenerationStatus('已停止生成', { retry: true });
   }
 }
+function setGenerationStatus(message, options = {}) {
+  const box = $('#generationStatus');
+  if (!box) return;
+  box.classList.toggle('hidden', !message);
+  if (!message) return;
+  $('#generationStatusText').textContent = message;
+  $('#stopGenerationButton').classList.toggle('hidden', !options.stop);
+  $('#retryGenerationButton').classList.toggle('hidden', !options.retry);
+}
+function stopArticleGeneration() {
+  const generation = state.articleGeneration;
+  if (!generation) return;
+  generation.stopped = true;
+  generation.controller.abort();
+  setLoading(false);
+  if (generation.partial) {
+    generation.partial.partial = true;
+    saveArticle(generation.partial);
+    renderArticle(generation.partial);
+    setGenerationStatus('已停止生成，已保留当前内容', { retry: true });
+  } else {
+    setGenerationStatus('已停止生成', { retry: true });
+  }
+}
+﻿function setGenerationStatus(message, options = {}) {
+  const box = $('#generationStatus');
+  if (!box) return;
+  box.classList.toggle('hidden', !message);
+  if (!message) return;
+  $('#generationStatusText').textContent = message;
+  $('#stopGenerationButton').classList.toggle('hidden', !options.stop);
+  $('#retryGenerationButton').classList.toggle('hidden', !options.retry);
+}
+function stopArticleGeneration() {
+  const generation = state.articleGeneration;
+  if (!generation) return;
+  generation.stopped = true;
+  generation.controller.abort();
+  setLoading(false);
+  if (generation.partial) {
+    generation.partial.partial = true;
+    saveArticle(generation.partial);
+    renderArticle(generation.partial);
+    setGenerationStatus('已停止生成，已保留当前内容', { retry: true });
+  } else {
+    setGenerationStatus('已停止生成', { retry: true });
+  }
+}
+async function enrichCurrentArticle() {
+  const article = state.currentArticle;
+  if (!article || !article.metadataPending) return;
+  const course = findCourse(article.grammarId);
+  if (!course) return;
+  setLoading(true, '正在补充中文翻译和语法说明…');
+  try {
+    await enrichArticleWithAI(article, course);
+    saveArticle(article);
+    renderArticle(article);
+    setGenerationStatus('');
+    showToast('中文翻译和语法说明已补齐');
+  } catch (error) {
+    article.metadataPending = true;
+    saveArticle(article);
+    renderArticle(article);
+    setGenerationStatus('翻译或语法暂时未补齐，可稍后重试', { retry: true });
+    showToast('补充失败：' + error.message);
+  } finally { setLoading(false); }
+}
 async function generateArticle() {
   const courseId = $('#articleGrammar').value;
   const level = $('#articleLevel').value;
@@ -1286,7 +1400,7 @@ async function generateArticle() {
     if (isAIConfigured()) {
       setLoading(true, '正在连接 AI…');
       setGenerationStatus('等待 AI 响应…', { stop: true });
-      const result = await generateAIArticleStream(course, level, topicId, partial => {
+      const result = await generateAIArticleTextStream(course, level, topicId, partial => {
         if (state.articleGeneration !== generation) return;
         generation.partial = partial;
         firstProgress = true;
@@ -1307,15 +1421,27 @@ async function generateArticle() {
       }, generation.controller.signal);
       if (state.articleGeneration !== generation) return;
       article = result.article;
-      complete = !result.partial;
+      article.metadataPending = true;
+      saveArticle(article);
+      renderArticle(article);
       setLoading(false);
-      if (result.partial) {
+      if (result.partial || generation.stopped) {
         article.partial = true;
-        setGenerationStatus(generation.stopped ? '已停止生成，已保留当前内容' : '生成中断，已保留当前内容', { retry: true });
+        setGenerationStatus('已保留已生成的英文文章', { retry: true });
       } else {
-        article.partial = false;
-        setGenerationStatus('');
-        if (result.streamed) showToast(`流式生成完成 · 首字 ${result.firstDeltaMs || 0}ms`);
+        setGenerationStatus('英文正文已生成，正在补充中文翻译和语法说明…', {});
+        try {
+          await enrichArticleWithAI(article, course, generation.controller.signal);
+          complete = true;
+          setGenerationStatus('');
+          saveArticle(article);
+          renderArticle(article);
+        } catch (enrichError) {
+          if (generation.stopped) { article.partial = true; setGenerationStatus('已停止生成，英文文章已保留', { retry: true }); }
+          else { article.metadataPending = true; setGenerationStatus('英文文章已保存，翻译和语法可稍后补充', { retry: true }); showToast('英文文章已保存，补充翻译失败：' + enrichError.message); }
+          saveArticle(article);
+          renderArticle(article);
+        }
       }
     } else {
       article = createLocalArticle(course, level, topicId);
@@ -1344,6 +1470,7 @@ async function generateArticle() {
   if (!article || state.articleGeneration !== generation) return;
   saveArticle(article); state.selectedSentenceIndex = null; renderArticle(article); touchStudy(); updateStats(); if (complete) setGenerationStatus('');
 }
+
 const mnemonicSeeds = {
   student: 'student 来自 study（学习），学生就是把学习当成日常的人。',
   teacher: 'teacher 与 teach（教）同源，负责教的人就是老师。',
@@ -1625,7 +1752,15 @@ function removeVocabularyWord(key) {
   showToast('已移出单词本');
 }
 
-function setConnectionStatus(type, title, detail = '') {
+function setApiKeyVisibility(visible) {
+  const input = $('#settingApiKey');
+  const button = $('#toggleApiKey');
+  if (!input || !button) return;
+  input.classList.toggle('secret-input-masked', !visible);
+  button.textContent = visible ? '隐藏' : '显示';
+  button.setAttribute('aria-pressed', String(visible));
+  button.setAttribute('aria-label', visible ? '隐藏 API Key' : '显示 API Key');
+}function setConnectionStatus(type, title, detail = '') {
   const box = $('#aiConnectionStatus');
   if (!box) return;
   box.className = `ai-connection-status ${type}`;
@@ -1724,7 +1859,11 @@ function saveSettingsForm() {
   if (isAIConfigured()) testAIConnection();
 }
 function exportData() {
-  const payload = { version: 1, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, settings: { baseUrl: state.settings.baseUrl, model: state.settings.model } };
+  const includeApiKey = Boolean($('#exportApiKey') && $('#exportApiKey').checked);
+  if (includeApiKey && !confirm('备份将包含明文 API Key。不要把此文件分享给他人。是否继续导出？')) return;
+  const settingsBackup = { baseUrl: state.settings.baseUrl, model: state.settings.model };
+  if (includeApiKey) settingsBackup.apiKey = state.settings.apiKey;
+  const payload = { version: 2, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, settings: settingsBackup };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -1732,9 +1871,8 @@ function exportData() {
   link.download = `english-learning-backup-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   URL.revokeObjectURL(url);
-  showToast('备份已导出，API Key 未包含在文件中');
+  showToast(includeApiKey ? '备份已导出，包含明文 API Key' : '备份已导出，未包含 API Key');
 }
-
 function importData(file) {
   const reader = new FileReader();
   reader.onload = () => {
@@ -1742,12 +1880,15 @@ function importData(file) {
       const payload = JSON.parse(reader.result);
       if (!payload || typeof payload !== 'object') throw new Error('文件内容无效');
       if (!payload.progress || !payload.vocabulary || !Array.isArray(payload.articles)) throw new Error('缺少学习数据字段');
-      if (!confirm('导入将替换当前课程进度、生词本和文章记录，是否继续？')) return;
+      const includesKey = Boolean(payload.settings && payload.settings.apiKey);
+      const message = includesKey ? '备份包含明文 API Key。导入会替换当前设置和学习数据，是否继续？' : '导入将替换当前课程进度、生词本和文章记录，是否继续？';
+      if (!confirm(message)) return;
       state.progress = payload.progress;
       state.vocabulary = payload.vocabulary;
       state.articles = payload.articles;
       if (payload.settings && payload.settings.baseUrl) state.settings.baseUrl = payload.settings.baseUrl;
       if (payload.settings && payload.settings.model) state.settings.model = payload.settings.model;
+      if (payload.settings && payload.settings.apiKey) state.settings.apiKey = payload.settings.apiKey;
       writeJSON(STORAGE.progress, state.progress);
       writeJSON(STORAGE.vocabulary, state.vocabulary);
       writeJSON(STORAGE.articles, state.articles);
@@ -1868,6 +2009,7 @@ async function handleClick(event) {
   else if (action === 'reset-practice') resetPractice(lessonList.find(item => item.id === state.progress.lastLessonId));
   else if (action === 'play-video') { const src = actionButton.dataset.videoSrc; actionButton.outerHTML = `<div class="video-frame"><iframe src="${src}" loading="lazy" allowfullscreen title="${escapeHtml(actionButton.dataset.videoTitle || '视频课程')}"></iframe></div>`; }
   else if (action === 'stop-generation') stopArticleGeneration();
+  else if (action === 'enrich-article') enrichCurrentArticle();
   else if (action === 'regenerate-article') generateArticle();
   else if (action === 'open-reading-settings') { $('#articleControls').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#articleGrammar').focus(); }
   else if (action === 'toggle-all-translations') toggleAllTranslations();
