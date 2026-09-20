@@ -464,3 +464,11 @@ img, iframe, video, select, textarea, input { max-width: 100%; }
 @media (max-width: 860px) {
   .mobile-nav:not(.hidden) { display: block; }
 }
+.secret-input-wrap { position: relative; display: flex; align-items: center; }
+.secret-input-wrap .secret-input { padding-right: 64px; }
+.secret-input-masked { -webkit-text-security: disc; text-security: disc; }
+.secret-toggle { position: absolute; right: 6px; min-width: 48px; min-height: 36px; padding: 6px 9px; border: 0; border-radius: 8px; background: #eef3ef; color: var(--green); font-size: 12px; font-weight: 800; cursor: pointer; }
+.secret-toggle:hover { background: var(--green-soft); }
+@media (max-width: 620px) {
+  .secret-toggle { min-width: 56px; min-height: 42px; font-size: 13px; }
+}
