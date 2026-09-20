@@ -495,7 +495,8 @@ const state = {
   lessonSession: null,
   currentArticle: null,
   selectedWord: null,
-  review: { queue: [], index: 0, revealed: false, dueOnly: true }
+  review: { queue: [], index: 0, revealed: false, dueOnly: true },
+  metadataEnrichment: null
 };
 
 const LEVEL_ORDER = ['A1', 'A2', 'B1', 'CET4'];
@@ -1112,6 +1113,32 @@ async function enrichArticleWithAI(article, course, signal) {
   article.partial = false;
   return article;
 }
+function metadataEnrichmentFor(article) {
+  const current = state.metadataEnrichment;
+  return current && article && current.articleId === article.id ? current : null;
+}
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+async function enrichArticleWithRetry(article, course, signal) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    if (signal && signal.aborted) throw new Error('AI 请求已取消');
+    state.metadataEnrichment = { articleId: article.id, attempt, retrying: attempt > 1 };
+    if (state.currentArticle && state.currentArticle.id === article.id) renderArticle(article);
+    try {
+      await enrichArticleWithAI(article, course, signal);
+      state.metadataEnrichment = null;
+      return article;
+    } catch (error) {
+      lastError = error;
+      if ((signal && signal.aborted) || (state.articleGeneration && state.articleGeneration.stopped)) throw error;
+      if (attempt < 2) await delay(800);
+    }
+  }
+  state.metadataEnrichment = null;
+  throw lastError || new Error('补充失败');
+}
 async function generateAIArticleTextStream(course, level, topicId, articleType, onPartial, onProgress, signal) {
   const startedAt = Date.now();
   let firstDeltaAt = 0;
@@ -1185,6 +1212,7 @@ function openSavedArticle(id) {
   const article = (state.articles || []).find(item => item.id === id);
   if (!article) return;
   state.currentArticle = article;
+  state.selectedSentenceIndex = null;
   const articleLevel = LEVEL_ORDER.includes(article.level) ? article.level : (state.settings.level || 'A1');
   if (state.settings.level !== articleLevel) {
     state.settings.level = articleLevel;
@@ -1243,6 +1271,12 @@ function renderArticle(article) {
   const cueSet = new Set((course.cues || []).map(word => word.toLowerCase()));
   const savedKeys = new Set(Object.keys(state.vocabulary));
   const marked = article.markedWords || {};
+  const enrichment = metadataEnrichmentFor(article);
+  const metadataStatus = enrichment
+    ? `<span id="articleMetadataStatus" class="metadata-inline-status" aria-live="polite">${enrichment.retrying ? '首次补充失败，正在自动重试…' : '正在自动补充中文和语法…'}</span>`
+    : article.metadataPending && !article.partial && !state.articleGeneration
+      ? '<button class="secondary-button" type="button" data-action="enrich-article">重试补充翻译和语法</button>'
+      : '';
   const sourceLabel = article.partial ? 'AI 生成中' : (article.metadataPending ? 'AI 英文版' : (article.source === 'AI' ? 'AI 生成' : '本地文章'));
   const typeLabel = article.level === 'CET4' ? ({ wordBank: '选词填空 · 200–250词', careful: '仔细阅读 · 300–350词', long: '长篇阅读 · 900–1000词' })[article.articleType] || '' : '等级默认';
   const coverageLabel = article.level === 'CET4' && article.cet4Coverage != null ? '四级词汇覆盖 ' + article.cet4Coverage + '%' : '';
@@ -1269,7 +1303,7 @@ function renderArticle(article) {
   }).join(' ')}</p>`).join('');
   const totalWords = article.sentences.reduce((sum, sentence) => sum + (sentence.en.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || []).length, 0);
   $('#articleWordCount').textContent = `${totalWords} 个词`;
-  $('#articlePaper').innerHTML = `<header class="article-header"><span class="eyebrow">${escapeHtml(article.level)} · ${sourceLabel}</span><h2>${escapeHtml(article.title)}</h2><div class="article-zh-title ${view.allTranslations ? '' : 'hidden'}">${escapeHtml(article.titleZh || '')}</div><div class="article-meta"><span>目标语法：${escapeHtml(article.grammarFocus || course.title)}</span><span>${article.sentences.length} 句 · ${paragraphs.length} 段</span>${typeLabel ? `<span>${typeLabel}</span>` : ''}${coverageLabel ? `<span>${coverageLabel}</span>` : ''}<span>点击单词查词典，点击句子单独切换</span></div></header><div class="article-body">${body}</div><div class="article-toolbar"><button class="secondary-button" type="button" data-action="toggle-all-translations">${view.allTranslations ? '隐藏全文中文' : '显示全文中文'}</button><button class="secondary-button" type="button" data-action="toggle-all-grammar">${view.allGrammar ? '隐藏全部语法' : '显示全部语法'}</button>${article.metadataPending ? '<button class="secondary-button" type="button" data-action="enrich-article">补充翻译和语法</button>' : ''}<button class="primary-button" type="button" data-action="regenerate-article">换一篇</button><button class="text-button" type="button" data-action="open-reading-settings">调整生成条件</button></div>`;
+  $('#articlePaper').innerHTML = `<header class="article-header"><span class="eyebrow">${escapeHtml(article.level)} · ${sourceLabel}</span><h2>${escapeHtml(article.title)}</h2><div class="article-zh-title ${view.allTranslations ? '' : 'hidden'}">${escapeHtml(article.titleZh || '')}</div><div class="article-meta"><span>目标语法：${escapeHtml(article.grammarFocus || course.title)}</span><span>${article.sentences.length} 句 · ${paragraphs.length} 段</span>${typeLabel ? `<span>${typeLabel}</span>` : ''}${coverageLabel ? `<span>${coverageLabel}</span>` : ''}<span>点击单词查词典，点击句子单独切换</span></div></header><div class="article-body">${body}</div><div class="article-toolbar"><button class="secondary-button" type="button" data-action="toggle-all-translations">${view.allTranslations ? '隐藏全文中文' : '显示全文中文'}</button><button class="secondary-button" type="button" data-action="toggle-all-grammar">${view.allGrammar ? '隐藏全部语法' : '显示全部语法'}</button>${metadataStatus}<button class="primary-button" type="button" data-action="regenerate-article">换一篇</button><button class="text-button" type="button" data-action="open-reading-settings">调整生成条件</button></div>`;
   renderSentenceTools();
 }
 function renderSentenceTools() {
@@ -1281,7 +1315,7 @@ function renderSentenceTools() {
   const index = state.selectedSentenceIndex;
   const sentence = article.sentences[index];
   box.classList.remove('hidden');
-  box.innerHTML = `<span class="eyebrow">已选句子</span><p class="selected-sentence">${escapeHtml(sentence.en)}</p><div class="drawer-actions"><button class="secondary-button" type="button" data-action="toggle-sentence-translation">${view.allTranslations || view.sentenceTranslations[index] ? '隐藏本句中文' : '显示本句中文'}</button><button class="secondary-button" type="button" data-action="toggle-sentence-grammar">${view.allGrammar || view.sentenceGrammar[index] ? '隐藏本句语法' : '显示本句语法'}</button></div>`;
+  box.innerHTML = `<div class="sentence-tools-head"><span class="eyebrow">已选句子</span><button class="sentence-tools-close" type="button" data-action="close-sentence-tools" aria-label="关闭句子工具">×</button></div><p class="selected-sentence">${escapeHtml(sentence.en)}</p><div class="drawer-actions sentence-tools-actions"><button class="secondary-button" type="button" data-action="toggle-sentence-translation">${view.allTranslations || view.sentenceTranslations[index] ? '隐藏本句中文' : '显示本句中文'}</button><button class="secondary-button" type="button" data-action="toggle-sentence-grammar">${view.allGrammar || view.sentenceGrammar[index] ? '隐藏本句语法' : '显示本句语法'}</button></div>`;
 }
 function sentenceElementFromNode(node) {
   const element = node && node.nodeType === 1 ? node : node && node.parentElement;
@@ -1293,16 +1327,37 @@ function selectSentence(index) {
   $$('.article-sentence').forEach(element => element.classList.toggle('selected', Number(element.dataset.articleSentence) === index));
   renderSentenceTools();
 }
-function selectSentenceFromMouse(event) {
+function clearSelectedSentence() {
+  state.selectedSentenceIndex = null;
+  const selection = window.getSelection();
+  if (selection) selection.removeAllRanges();
+  $$('.article-sentence').forEach(element => element.classList.remove('selected'));
+  renderSentenceTools();
+}
+let sentenceSelectionTimer = null;
+function selectSentenceFromSelection() {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || !selection.rangeCount) return;
-  const start = sentenceElementFromNode(selection.anchorNode);
-  const end = sentenceElementFromNode(selection.focusNode);
-  if (!start) return;
-  if (end && end !== start) return;
+  const range = selection.getRangeAt(0);
+  const start = sentenceElementFromNode(range.startContainer);
+  const end = sentenceElementFromNode(range.endContainer);
+  if (!start || (end && end !== start)) return;
+  const index = Number(start.dataset.articleSentence);
+  if (!Number.isInteger(index)) return;
   state.justSelectedText = true;
-  setTimeout(() => { state.justSelectedText = false; }, 0);
-  selectSentence(Number(start.dataset.articleSentence));
+  clearTimeout(state.justSelectedTextTimer);
+  state.justSelectedTextTimer = setTimeout(() => { state.justSelectedText = false; }, 350);
+  selectSentence(index);
+}
+function scheduleSentenceSelection() {
+  if (state.currentView !== 'reading') return;
+  clearTimeout(sentenceSelectionTimer);
+  const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  sentenceSelectionTimer = setTimeout(selectSentenceFromSelection, coarsePointer ? 180 : 40);
+}
+function selectSentenceFromMouse() {
+  selectSentenceFromSelection();
+  state.justSelectedText = false;
 }
 
 function toggleAllTranslations() {
@@ -1356,141 +1411,25 @@ function stopArticleGeneration() {
     setGenerationStatus('已停止生成', { retry: true });
   }
 }
-function setGenerationStatus(message, options = {}) {
-  const box = $('#generationStatus');
-  if (!box) return;
-  box.classList.toggle('hidden', !message);
-  if (!message) return;
-  $('#generationStatusText').textContent = message;
-  $('#stopGenerationButton').classList.toggle('hidden', !options.stop);
-  $('#retryGenerationButton').classList.toggle('hidden', !options.retry);
-}
-function stopArticleGeneration() {
-  const generation = state.articleGeneration;
-  if (!generation) return;
-  generation.stopped = true;
-  generation.controller.abort();
-  setLoading(false);
-  if (generation.partial) {
-    generation.partial.partial = true;
-    saveArticle(generation.partial);
-    renderArticle(generation.partial);
-    setGenerationStatus('已停止生成，已保留当前内容', { retry: true });
-  } else {
-    setGenerationStatus('已停止生成', { retry: true });
-  }
-}
-function setGenerationStatus(message, options = {}) {
-  const box = $('#generationStatus');
-  if (!box) return;
-  box.classList.toggle('hidden', !message);
-  if (!message) return;
-  $('#generationStatusText').textContent = message;
-  $('#stopGenerationButton').classList.toggle('hidden', !options.stop);
-  $('#retryGenerationButton').classList.toggle('hidden', !options.retry);
-}
-function stopArticleGeneration() {
-  const generation = state.articleGeneration;
-  if (!generation) return;
-  generation.stopped = true;
-  generation.controller.abort();
-  setLoading(false);
-  if (generation.partial) {
-    generation.partial.partial = true;
-    saveArticle(generation.partial);
-    renderArticle(generation.partial);
-    setGenerationStatus('已停止生成，已保留当前内容', { retry: true });
-  } else {
-    setGenerationStatus('已停止生成', { retry: true });
-  }
-}
-﻿function setGenerationStatus(message, options = {}) {
-  const box = $('#generationStatus');
-  if (!box) return;
-  box.classList.toggle('hidden', !message);
-  if (!message) return;
-  $('#generationStatusText').textContent = message;
-  $('#stopGenerationButton').classList.toggle('hidden', !options.stop);
-  $('#retryGenerationButton').classList.toggle('hidden', !options.retry);
-}
-function stopArticleGeneration() {
-  const generation = state.articleGeneration;
-  if (!generation) return;
-  generation.stopped = true;
-  generation.controller.abort();
-  setLoading(false);
-  if (generation.partial) {
-    generation.partial.partial = true;
-    saveArticle(generation.partial);
-    renderArticle(generation.partial);
-    setGenerationStatus('已停止生成，已保留当前内容', { retry: true });
-  } else {
-    setGenerationStatus('已停止生成', { retry: true });
-  }
-}
 async function enrichCurrentArticle() {
   const article = state.currentArticle;
-  if (!article || !article.metadataPending) return;
+  if (!article || !article.metadataPending || state.metadataEnrichment) return;
   const course = findCourse(article.grammarId);
   if (!course) return;
-  setLoading(true, '正在补充中文翻译和语法说明…');
   try {
-    await enrichArticleWithAI(article, course);
+    await enrichArticleWithRetry(article, course, null);
     saveArticle(article);
     renderArticle(article);
     setGenerationStatus('');
     showToast('中文翻译和语法说明已补齐');
   } catch (error) {
     article.metadataPending = true;
+    state.metadataEnrichment = null;
     saveArticle(article);
     renderArticle(article);
-    setGenerationStatus('翻译或语法暂时未补齐，可稍后重试', { retry: true });
+    setGenerationStatus('自动补充失败，可点击“重试补充翻译和语法”', {});
     showToast('补充失败：' + error.message);
-  } finally { setLoading(false); }
-}
-﻿function setGenerationStatus(message, options = {}) {
-  const box = $('#generationStatus');
-  if (!box) return;
-  box.classList.toggle('hidden', !message);
-  if (!message) return;
-  $('#generationStatusText').textContent = message;
-  $('#stopGenerationButton').classList.toggle('hidden', !options.stop);
-  $('#retryGenerationButton').classList.toggle('hidden', !options.retry);
-}
-function stopArticleGeneration() {
-  const generation = state.articleGeneration;
-  if (!generation) return;
-  generation.stopped = true;
-  generation.controller.abort();
-  setLoading(false);
-  if (generation.partial) {
-    generation.partial.partial = true;
-    saveArticle(generation.partial);
-    renderArticle(generation.partial);
-    setGenerationStatus('已停止生成，已保留当前内容', { retry: true });
-  } else {
-    setGenerationStatus('已停止生成', { retry: true });
   }
-}
-async function enrichCurrentArticle() {
-  const article = state.currentArticle;
-  if (!article || !article.metadataPending) return;
-  const course = findCourse(article.grammarId);
-  if (!course) return;
-  setLoading(true, '正在补充中文翻译和语法说明…');
-  try {
-    await enrichArticleWithAI(article, course);
-    saveArticle(article);
-    renderArticle(article);
-    setGenerationStatus('');
-    showToast('中文翻译和语法说明已补齐');
-  } catch (error) {
-    article.metadataPending = true;
-    saveArticle(article);
-    renderArticle(article);
-    setGenerationStatus('翻译或语法暂时未补齐，可稍后重试', { retry: true });
-    showToast('补充失败：' + error.message);
-  } finally { setLoading(false); }
 }
 async function generateArticle() {
   const courseId = $('#articleGrammar').value;
@@ -1540,23 +1479,33 @@ async function generateArticle() {
       if (state.articleGeneration !== generation) return;
       article = result.article;
       article.metadataPending = true;
+      state.metadataEnrichment = { articleId: article.id, attempt: 1, retrying: false };
       saveArticle(article);
       renderArticle(article);
       setLoading(false);
       if (result.partial || generation.stopped) {
         article.partial = true;
+        state.metadataEnrichment = null;
         setGenerationStatus('已保留已生成的英文文章', { retry: true });
       } else {
-        setGenerationStatus('英文正文已生成，正在补充中文翻译和语法说明…', {});
+        setGenerationStatus('英文正文已生成，正在自动补充中文和语法…', {});
         try {
-          await enrichArticleWithAI(article, course, generation.controller.signal);
+          await enrichArticleWithRetry(article, course, generation.controller.signal);
           complete = true;
           setGenerationStatus('');
           saveArticle(article);
           renderArticle(article);
         } catch (enrichError) {
-          if (generation.stopped) { article.partial = true; setGenerationStatus('已停止生成，英文文章已保留', { retry: true }); }
-          else { article.metadataPending = true; setGenerationStatus('英文文章已保存，翻译和语法可稍后补充', { retry: true }); showToast('英文文章已保存，补充翻译失败：' + enrichError.message); }
+          if (generation.stopped) {
+            article.partial = true;
+            state.metadataEnrichment = null;
+            setGenerationStatus('已停止生成，英文文章已保留', { retry: true });
+          } else {
+            article.metadataPending = true;
+            state.metadataEnrichment = null;
+            setGenerationStatus('自动补充失败，可点击“重试补充翻译和语法”', {});
+            showToast('英文文章已保存，自动补充失败：' + enrichError.message);
+          }
           saveArticle(article);
           renderArticle(article);
         }
@@ -1586,7 +1535,9 @@ async function generateArticle() {
     clearTimeout(bufferTimer);
     if (state.articleGeneration === generation) { button.disabled = false; $('#generateButtonLabel').textContent = '生成文章'; }
   }
-  if (!article || state.articleGeneration !== generation) return;
+  if (state.articleGeneration !== generation) return;
+  state.articleGeneration = null;
+  if (!article) { state.metadataEnrichment = null; return; }
   saveArticle(article); state.selectedSentenceIndex = null; renderArticle(article); touchStudy(); updateStats(); if (complete) setGenerationStatus('');
 }
 
@@ -2073,7 +2024,11 @@ async function handleClick(event) {
     return;
   }
   const wordButton = event.target.closest('[data-article-word]');
-  if (wordButton) { openWordDrawer(wordButton.dataset.articleWord, Number(wordButton.dataset.sentenceIndex)); return; }
+  if (wordButton) {
+    if (state.justSelectedText) return;
+    openWordDrawer(wordButton.dataset.articleWord, Number(wordButton.dataset.sentenceIndex));
+    return;
+  }
   const courseButton = event.target.closest('[data-course-id]');
   if (courseButton && courseButton.dataset.courseId) {
     const course = findCourse(courseButton.dataset.courseId);
@@ -2135,6 +2090,7 @@ async function handleClick(event) {
   else if (action === 'toggle-all-grammar') toggleAllGrammar();
   else if (action === 'toggle-sentence-translation') toggleSentenceTranslation();
   else if (action === 'toggle-sentence-grammar') toggleSentenceGrammar();
+  else if (action === 'close-sentence-tools') clearSelectedSentence();
   else if (action === 'remove-word') removeVocabularyWord(actionButton.dataset.word);
   else if (action === 'speak-word') speakText(actionButton.dataset.word);
   else if (action === 'export-data') exportData();
@@ -2182,9 +2138,9 @@ function bindEvents() {
   $('#articleGrammar').addEventListener('change', updateReadingVideo);
   $('#importFile').addEventListener('change', event => { const file = event.target.files[0]; if (file) importData(file); event.target.value = ''; });
   $('#wordDrawer').addEventListener('click', event => { if (event.target === $('#wordDrawer')) closeWordDrawer(); });
-  $('#articlePaper').addEventListener('mouseup', selectSentenceFromMouse);
-  $('#articlePaper').addEventListener('touchend', () => setTimeout(selectSentenceFromMouse, 80));
-  document.addEventListener('selectionchange', () => { if (state.currentView === 'reading') setTimeout(selectSentenceFromMouse, 80); });
+  $('#articlePaper').addEventListener('mouseup', scheduleSentenceSelection);
+  $('#articlePaper').addEventListener('touchend', scheduleSentenceSelection);
+  document.addEventListener('selectionchange', scheduleSentenceSelection);
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeWordDrawer(); $('#mobileNav').classList.add('hidden'); } });
 }
 function init() {
