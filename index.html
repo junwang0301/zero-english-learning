@@ -125,6 +125,7 @@
         <form id="articleControls" class="article-controls">
           <label>目标语法<select id="articleGrammar"></select></label>
           <label>学习难度<select id="articleLevel"><option value="A1">A1 零基础</option><option value="A2">A2 基础</option><option value="B1">B1 进阶</option><option value="CET4">CET-4 四级</option></select></label>
+          <label>阅读题型<select id="articleType"><option value="careful">仔细阅读 · 300–350 词</option><option value="wordBank">选词填空 · 200–250 词</option><option value="long">长篇阅读 · 900–1000 词</option></select></label>
           <label>文章主题<select id="articleTopic"><option value="life">日常生活</option><option value="school">校园学习</option><option value="family">家庭朋友</option><option value="travel">旅行见闻</option><option value="hobby">兴趣爱好</option></select></label>
           <button class="primary-button" type="submit"><span id="generateButtonLabel">生成文章</span></button>
         </form>
@@ -228,6 +229,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="loadingMask" class="loading-mask hidden" aria-live="polite"><div class="spinner"></div><strong id="loadingText">正在生成文章…</strong><span>通常需要几秒钟</span></div>
 
+  <script src="cet4-words.js" defer></script>
   <script src="videos.js" defer></script>
   <script src="app.js" defer></script>
 </body>
