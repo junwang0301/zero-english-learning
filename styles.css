@@ -488,3 +488,14 @@ img, iframe, video, select, textarea, input { max-width: 100%; }
 .ai-connection-status.success { background: #e2f3e8; color: #235f45; }
 .ai-connection-status.error { background: #fae9e7; color: #963b34; }
 .ai-connection-status strong { display: block; margin-bottom: 3px; }
+.article-history-panel { padding: 18px; }
+.article-history-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.article-history-head h3 { margin: 0; font-size: 16px; }
+.article-history-list { display: grid; gap: 8px; max-height: 420px; overflow-y: auto; }
+.article-history-item { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
+.article-history-open { min-width: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.article-history-open strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.article-history-open small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+.article-history-delete { align-self: center; border: 0; border-radius: 8px; background: #f8e7e5; color: var(--danger); padding: 6px 8px; cursor: pointer; }
+.article-history-empty { color: var(--muted); font-size: 12px; }
+.partial-badge { display: inline-block; margin-left: 5px; padding: 2px 5px; border-radius: 999px; background: #fff0bd; color: #805a00; font-size: 10px; }
