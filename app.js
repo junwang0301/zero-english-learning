@@ -905,14 +905,156 @@ function validateAIArticle(raw, course, level, topicId) {
   if (!raw.title || sentences.length < 6) throw new Error('AI 文章缺少标题或有效内容');
   const vocabulary = Array.isArray(raw.vocabulary) ? raw.vocabulary.filter(item => item && item.word).map(item => ({ word: normalizeWord(item.word), phonetic: String(item.phonetic || ''), meaningZh: String(item.meaningZh || ''), contextZh: String(item.contextZh || ''), example: String(item.example || '') })) : buildVocabulary(sentences);
   return { id: uid(), source: 'AI', level, grammarId: course.id, topicId, title: String(raw.title).trim(), titleZh: String(raw.titleZh || '').trim(), grammarFocus: String(raw.grammarFocus || course.title).trim(), sentences, vocabulary, markedWords: {}, viewState: { allTranslations: false, allGrammar: false, sentenceTranslations: {}, sentenceGrammar: {} }, createdAt: Date.now() };
-}async function generateAIArticle(course, level, topicId) {
+}function buildArticleMessages(course, level, topicId) {
   const topicNames = { life: '日常生活', school: '校园学习', family: '家庭朋友', travel: '旅行见闻', hobby: '兴趣爱好' };
   const levelRules = { A1: '使用极简单句和最常见词汇，文章 100-140 词。', A2: '使用基础连接词和常见时态，文章 140-190 词。', B1: '使用自然连贯的段落和基础从句，文章 190-260 词。', CET4: '按大学英语四级阅读难度，使用常用学术与社会话题词汇、复杂句和逻辑连接，文章 280-380 词，但中文解释保持通俗。' };
-  const system = `你是一名严谨的中国英语老师。你只为零基础到四级学习者写英语阅读。文章必须是完整、连贯的短文，不要写成逐句罗列或语法例句清单。只输出一个 JSON 对象，不要 Markdown 代码块。JSON 结构必须为：{"title":"英文标题","titleZh":"中文标题","grammarFocus":"语法重点","sentences":[{"en":"英文句子","zh":"准确中文翻译","grammarNote":"该句目标语法说明","paragraph":0}],"vocabulary":[{"word":"小写原词","phonetic":"音标可留空","meaningZh":"结合本文的中文释义","contextZh":"本句中文解释","example":"包含该词的英文例句"}]}。paragraph 从 0 开始表示第几段。`;
+  const system = `你是一名严谨的中国英语老师。你只为零基础到四级学习者写英语阅读。文章必须是完整、连贯的短文，不要写成逐句罗列或语法例句清单。只输出一个 JSON 对象，不要 Markdown 代码块。JSON 结构的字段顺序必须为：{"title":"英文标题","titleZh":"中文标题","grammarFocus":"语法重点","sentences":[{"en":"英文句子","zh":"准确中文翻译","grammarNote":"该句目标语法说明","paragraph":0}],"vocabulary":[{"word":"小写原词","phonetic":"音标可留空","meaningZh":"结合本文的中文释义","contextZh":"本句中文解释","example":"包含该词的英文例句"}]}。paragraph 从 0 开始表示第几段。`;
   const user = `目标语法：${course.title}（${course.formula}）。\n难度：${level}。${levelRules[level] || levelRules.A1}\n主题：${topicNames[topicId] || '日常生活'}。\n写成 3-5 个自然段，每段 3-6 句，至少出现 5 次目标结构。所有句子按文章顺序放入 sentences 数组，不要逐句加标题或单独解释。词汇表覆盖主要实词。`;
-  const content = await callAI([{ role: 'system', content: system }, { role: 'user', content: user }], 0.7);
+  return [{ role: 'system', content: system }, { role: 'user', content: user }];
+}
+function parseJsonStringValue(raw, key) {
+  const marker = `"${key}"`;
+  const markerIndex = raw.indexOf(marker);
+  if (markerIndex < 0) return '';
+  let index = raw.indexOf(':', markerIndex + marker.length);
+  if (index < 0) return '';
+  while (index + 1 < raw.length && /\s/.test(raw[index + 1])) index++;
+  if (raw[index + 1] !== '"') return '';
+  const start = index + 1;
+  let escaped = false;
+  for (let i = start + 1; i < raw.length; i++) {
+    const char = raw[i];
+    if (char === '"' && !escaped) {
+      try { return JSON.parse(raw.slice(start, i + 1)); } catch (error) { return ''; }
+    }
+    if (char === '\\' && !escaped) escaped = true;
+    else escaped = false;
+  }
+  return '';
+}
+function completeSentenceObjects(raw) {
+  const marker = '"sentences"';
+  const markerIndex = raw.indexOf(marker);
+  if (markerIndex < 0) return [];
+  const arrayStart = raw.indexOf('[', markerIndex + marker.length);
+  if (arrayStart < 0) return [];
+  const objects = [];
+  let depth = 0;
+  let objectStart = -1;
+  let inString = false;
+  let escaped = false;
+  for (let i = arrayStart + 1; i < raw.length; i++) {
+    const char = raw[i];
+    if (inString) {
+      if (char === '"' && !escaped) inString = false;
+      if (char === '\\' && !escaped) escaped = true;
+      else escaped = false;
+      continue;
+    }
+    if (char === '"') { inString = true; continue; }
+    if (char === '{') { if (depth === 0) objectStart = i; depth++; }
+    else if (char === '}') {
+      depth--;
+      if (depth === 0 && objectStart >= 0) {
+        try { const item = JSON.parse(raw.slice(objectStart, i + 1)); if (item && item.en) objects.push(item); } catch (error) {}
+        objectStart = -1;
+      }
+    } else if (char === ']' && depth === 0) break;
+  }
+  return objects;
+}
+function parsePartialArticle(raw, course, level, topicId) {
+  const title = parseJsonStringValue(raw, 'title');
+  const items = completeSentenceObjects(raw);
+  if (!title || !items.length) return null;
+  const sentences = items.map((item, index) => ({ en: String(item.en || '').trim(), zh: String(item.zh || '').trim(), grammarNote: String(item.grammarNote || ''), paragraph: Number.isInteger(item.paragraph) ? Math.max(0, item.paragraph) : Math.floor(index / 3) })).filter(item => item.en);
+  if (!sentences.length) return null;
+  return { id: 'streaming-article', source: 'AI', partial: true, level, grammarId: course.id, topicId, title: String(title).trim(), titleZh: parseJsonStringValue(raw, 'titleZh').trim(), grammarFocus: parseJsonStringValue(raw, 'grammarFocus').trim() || course.title, sentences, vocabulary: buildVocabulary(sentences), markedWords: {}, viewState: { allTranslations: false, allGrammar: false, sentenceTranslations: {}, sentenceGrammar: {} }, createdAt: Date.now() };
+}
+async function callAIStream(messages, temperature, onDelta, externalSignal) {
+  if (!isAIConfigured()) throw new Error('AI 尚未配置');
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort();
+  if (externalSignal) externalSignal.addEventListener('abort', forwardAbort, { once: true });
+  const timeout = setTimeout(() => controller.abort(), 120000);
+  try {
+    const response = await fetch(apiChatUrl(state.settings.baseUrl), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.settings.apiKey}` },
+      body: JSON.stringify({ model: state.settings.model, temperature, messages, stream: true }),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const raw = await response.text();
+      const error = new Error(`AI 请求失败（${response.status}）：${raw.slice(0, 180)}`);
+      error.status = response.status;
+      error.streamUnsupported = [400, 404, 405, 415, 422].includes(response.status);
+      throw error;
+    }
+    if (!response.body || !response.body.getReader) throw new Error('当前服务不支持流式输出');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let content = '';
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      buffer += decoder.decode(part.value, { stream: true });
+      let newline;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        let line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (!line || line.startsWith(':')) continue;
+        if (line.startsWith('data:')) line = line.slice(5).trim();
+        if (line === '[DONE]') continue;
+        try {
+          const data = JSON.parse(line);
+          let delta = data && data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content;
+          if (Array.isArray(delta)) delta = delta.map(item => item && item.text ? item.text : '').join('');
+          if (typeof delta === 'string' && delta) { content += delta; onDelta(delta, content); }
+        } catch (error) {}
+      }
+    }
+    if (!content) throw new Error('流式响应为空');
+    return content;
+  } finally {
+    clearTimeout(timeout);
+    if (externalSignal) externalSignal.removeEventListener('abort', forwardAbort);
+  }
+}
+async function generateAIArticle(course, level, topicId) {
+  const content = await callAI(buildArticleMessages(course, level, topicId), 0.7);
   return validateAIArticle(extractJSON(content), course, level, topicId);
-}const localClosingParagraphs = {
+}
+async function generateAIArticleStream(course, level, topicId, onPartial, signal) {
+  const messages = buildArticleMessages(course, level, topicId);
+  let full = '';
+  let lastRenderLength = 0;
+  let lastRenderTime = 0;
+  try {
+    full = await callAIStream(messages, 0.7, (delta, accumulated) => {
+      if (accumulated.length - lastRenderLength < 70 && Date.now() - lastRenderTime < 300) return;
+      const partial = parsePartialArticle(accumulated, course, level, topicId);
+      if (partial) { lastRenderLength = accumulated.length; lastRenderTime = Date.now(); onPartial(partial, false); }
+    }, signal);
+    const article = validateAIArticle(extractJSON(full), course, level, topicId);
+    return { article, streamed: true, partial: false };
+  } catch (error) {
+    const partial = full ? parsePartialArticle(full, course, level, topicId) : null;
+    if (error.name === 'AbortError') {
+      if (partial) return { article: partial, streamed: true, partial: true, stopped: true };
+      throw error;
+    }
+    if (!full && !error.streamUnsupported) {
+      const content = await callAI(messages, 0.7);
+      return { article: validateAIArticle(extractJSON(content), course, level, topicId), streamed: false, partial: false };
+    }
+    if (partial) return { article: partial, streamed: true, partial: true, error };
+    const content = await callAI(messages, 0.7);
+    return { article: validateAIArticle(extractJSON(content), course, level, topicId), streamed: false, partial: false, fallback: true };
+  }
+}
+const localClosingParagraphs = {
   life: [articleSentence('Life is not always easy, but small routines can make it better.', '生活并不总是容易，但小的日常习惯可以让它变得更好。', '一般现在时'), articleSentence('I try to keep my room clean and my mind calm.', '我尽量保持房间整洁、内心平静。', '一般现在时'), articleSentence('At the end of the day, I write down one thing I learned.', '一天结束时，我会写下自己学到的一件事。', '一般现在时'), articleSentence('This simple habit helps me notice progress.', '这个简单习惯帮助我注意到进步。', '一般现在时')],
   school: [articleSentence('Our teacher often asks us to explain ideas in our own words.', '老师经常要求我们用自己的话解释观点。', '一般现在时'), articleSentence('This makes the lesson more active and useful.', '这让课堂更活跃、更有用。', '一般现在时'), articleSentence('After class, we compare notes and help each other.', '课后我们会对照笔记并互相帮助。', '一般现在时'), articleSentence('Little by little, difficult subjects become easier to understand.', '渐渐地，困难的科目变得更容易理解。', '一般现在时')],
   family: [articleSentence('Families do not always agree, but they can still listen to each other.', '家人并不总是意见一致，但依然可以互相倾听。', '一般现在时'), articleSentence('A kind word can change the mood of a whole room.', '一句友善的话能改变整个房间的气氛。', '一般现在时'), articleSentence('We share meals, stories and small everyday problems.', '我们分享饭菜、故事和日常小烦恼。', '一般现在时'), articleSentence('These moments make home feel safe and warm.', '这些时刻让家变得安全而温暖。', '一般现在时')],
@@ -948,7 +1090,7 @@ function renderArticle(article) {
   const cueSet = new Set((course.cues || []).map(word => word.toLowerCase()));
   const savedKeys = new Set(Object.keys(state.vocabulary));
   const marked = article.markedWords || {};
-  const sourceLabel = article.source === 'AI' ? 'AI 生成' : '本地文章';
+  const sourceLabel = article.partial ? 'AI 生成中' : (article.source === 'AI' ? 'AI 生成' : '本地文章');
   const paragraphs = [];
   article.sentences.forEach((sentence, sentenceIndex) => {
     const paragraphIndex = Number.isInteger(sentence.paragraph) ? sentence.paragraph : Math.floor(sentenceIndex / 3);
@@ -1035,36 +1177,85 @@ function toggleSentenceGrammar() {
   view.sentenceGrammar[index] = !view.sentenceGrammar[index];
   persistCurrentArticle();
   renderArticle(state.currentArticle);
-}async function generateArticle() {
+}function setGenerationStatus(message, options = {}) {
+  const box = $('#generationStatus');
+  if (!box) return;
+  box.classList.toggle('hidden', !message);
+  if (!message) return;
+  $('#generationStatusText').textContent = message;
+  $('#stopGenerationButton').classList.toggle('hidden', !options.stop);
+  $('#retryGenerationButton').classList.toggle('hidden', !options.retry);
+}
+function stopArticleGeneration() {
+  const generation = state.articleGeneration;
+  if (!generation) return;
+  generation.stopped = true;
+  generation.controller.abort();
+  setLoading(false);
+  if (generation.partial) {
+    generation.partial.partial = true;
+    saveArticle(generation.partial);
+    renderArticle(generation.partial);
+    setGenerationStatus('已停止生成，已保留当前内容', { retry: true });
+  } else {
+    setGenerationStatus('已停止生成', { retry: true });
+  }
+}
+async function generateArticle() {
   const courseId = $('#articleGrammar').value;
   const level = $('#articleLevel').value;
   const topicId = $('#articleTopic').value;
   const course = findCourse(courseId);
   if (!course) return;
+  if (state.articleGeneration) state.articleGeneration.controller.abort();
+  const generation = { id: uid(), controller: new AbortController(), partial: null, stopped: false };
+  state.articleGeneration = generation;
   const button = $('#articleControls .primary-button');
   button.disabled = true;
   $('#generateButtonLabel').textContent = '生成中…';
-  let article;
-  let fallbackReason = '';
-  if (isAIConfigured()) {
-    setLoading(true, 'AI 正在生成文章…');
-    try { article = await generateAIArticle(course, level, topicId); }
-    catch (error) { fallbackReason = error.message; article = createLocalArticle(course, level, topicId); showToast('AI 生成失败，已回退本地文章'); console.warn('AI 文章生成失败', error); }
-    finally { setLoading(false); }
-  } else {
-    article = createLocalArticle(course, level, topicId);
-    showToast('当前为本地模式，已生成模板文章');
+  let article = null;
+  let complete = false;
+  try {
+    if (isAIConfigured()) {
+      setLoading(true, '正在连接 AI…');
+      setGenerationStatus('等待 AI 响应…', { stop: true });
+      const result = await generateAIArticleStream(course, level, topicId, partial => {
+        if (state.articleGeneration !== generation) return;
+        generation.partial = partial;
+        setLoading(false);
+        setGenerationStatus(`正在生成，已收到 ${partial.sentences.length} 句…`, { stop: true });
+        renderArticle(partial);
+      }, generation.controller.signal);
+      if (state.articleGeneration !== generation) return;
+      article = result.article;
+      complete = !result.partial;
+      setLoading(false);
+      if (result.partial) { article.partial = true; setGenerationStatus(generation.stopped ? '已停止生成，已保留当前内容' : '生成中断，已保留当前内容', { retry: true }); }
+      else { article.partial = false; setGenerationStatus(''); }
+    } else {
+      article = createLocalArticle(course, level, topicId); complete = true; setGenerationStatus('');
+      showToast('当前为本地模式，已生成模板文章');
+    }
+  } catch (error) {
+    if (state.articleGeneration !== generation) return;
+    setLoading(false);
+    if (generation.stopped) {
+      if (generation.partial) { article = generation.partial; article.partial = true; setGenerationStatus('已停止生成，已保留当前内容', { retry: true }); }
+      else { article = null; setGenerationStatus('已停止生成', { retry: true }); }
+    } else if (generation.partial) {
+      article = generation.partial; article.partial = true;
+      setGenerationStatus('流式连接中断，已保留当前内容', { retry: true });
+      showToast('生成中断，已保留已收到的内容');
+    } else {
+      article = createLocalArticle(course, level, topicId); complete = true; setGenerationStatus('');
+      showToast('AI 生成失败，已回退本地文章'); console.warn('AI 文章生成失败', error);
+    }
+  } finally {
+    if (state.articleGeneration === generation) { button.disabled = false; $('#generateButtonLabel').textContent = '生成文章'; }
   }
-  saveArticle(article);
-  state.selectedSentenceIndex = null;
-  renderArticle(article);
-  touchStudy();
-  updateStats();
-  button.disabled = false;
-  $('#generateButtonLabel').textContent = '生成文章';
-  if (fallbackReason) console.info('回退原因：' + fallbackReason);
+  if (!article || state.articleGeneration !== generation) return;
+  saveArticle(article); state.selectedSentenceIndex = null; renderArticle(article); touchStudy(); updateStats(); if (complete) setGenerationStatus('');
 }
-
 const mnemonicSeeds = {
   student: 'student 来自 study（学习），学生就是把学习当成日常的人。',
   teacher: 'teacher 与 teach（教）同源，负责教的人就是老师。',
@@ -1345,31 +1536,103 @@ function removeVocabularyWord(key) {
   showToast('已移出单词本');
 }
 
+function setConnectionStatus(type, title, detail = '') {
+  const box = $('#aiConnectionStatus');
+  if (!box) return;
+  box.className = `ai-connection-status ${type}`;
+  box.innerHTML = `<strong>${escapeHtml(title)}</strong>${detail ? escapeHtml(detail) : ''}`;
+}
+function aiConnectionError(status, raw) {
+  const body = String(raw || '').slice(0, 240);
+  if (status === 401) return { title: 'API Key 无效', detail: `服务商返回 401。请检查 Key 是否完整、是否过期。\n${body}` };
+  if (status === 403) return { title: '没有模型访问权限', detail: `服务商返回 403。请检查账号权限或模型权限。\n${body}` };
+  if (status === 404) return { title: '接口地址或模型不存在', detail: `服务商返回 404。请检查 base URL，以及模型名是否支持 Chat Completions。\n${body}` };
+  if (status === 429) return { title: '请求被限流', detail: `服务商返回 429。账号额度不足或请求过于频繁。\n${body}` };
+  if (status) return { title: `连接失败（HTTP ${status}）`, detail: body || '请检查服务商配置。' };
+  return { title: '无法连接服务商', detail: `可能是网络不可用、CORS 未开放或接口地址错误。\n${body}` };
+}
+async function testAIConnection() {
+  const baseUrl = $('#settingBaseUrl').value.trim();
+  const model = $('#settingModel').value.trim();
+  const apiKey = $('#settingApiKey').value.trim();
+  const button = $('#testAiConnectionButton');
+  if (!baseUrl || !model || !apiKey) {
+    setConnectionStatus('error', '配置不完整', '请填写接口地址、模型名称和 API Key 后再测试。');
+    return false;
+  }
+  setConnectionStatus('testing', '正在测试连接…', `正在请求模型 ${model}`);
+  if (button) button.disabled = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(apiChatUrl(baseUrl), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, temperature: 0, stream: false, messages: [{ role: 'user', content: 'Reply with OK only.' }] }),
+      signal: controller.signal
+    });
+    const raw = await response.text();
+    if (!response.ok) {
+      const info = aiConnectionError(response.status, raw);
+      state.settings.connection = { ok: false, model, testedAt: Date.now(), error: info.title, detail: info.detail };
+      writeJSON(STORAGE.settings, state.settings);
+      setConnectionStatus('error', info.title, info.detail);
+      updateAIStatus();
+      return false;
+    }
+    const data = JSON.parse(raw);
+    const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    if (!content) throw new Error('服务返回成功状态，但没有模型文本内容。');
+    state.settings.connection = { ok: true, model, testedAt: Date.now(), detail: '连接测试通过' };
+    writeJSON(STORAGE.settings, state.settings);
+    setConnectionStatus('success', '连接成功', `模型：${model}\n测试时间：${new Date().toLocaleString('zh-CN')}`);
+    updateAIStatus();
+    return true;
+  } catch (error) {
+    const info = error.name === 'AbortError'
+      ? { title: '连接超时', detail: '服务商在 20 秒内没有响应。' }
+      : aiConnectionError(0, error.message);
+    state.settings.connection = { ok: false, model, testedAt: Date.now(), error: info.title, detail: info.detail };
+    writeJSON(STORAGE.settings, state.settings);
+    setConnectionStatus('error', info.title, info.detail);
+    updateAIStatus();
+    return false;
+  } finally {
+    clearTimeout(timeout);
+    if (button) button.disabled = false;
+  }
+}
 function updateAIStatus() {
   const badge = $('#aiStatusBadge');
   const configured = isAIConfigured();
-  badge.textContent = configured ? `AI 已配置 · ${state.settings.model}` : 'AI 未配置 · 本地模式';
-  badge.className = 'status-badge ' + (configured ? 'ready' : 'neutral');
+  const connection = state.settings.connection;
+  if (configured && connection && connection.ok === true) {
+    badge.textContent = `AI 已连接 · ${connection.model || state.settings.model}`;
+    badge.className = 'status-badge ready';
+  } else if (configured && connection && connection.ok === false) {
+    badge.textContent = 'AI 连接失败 · 请检查设置';
+    badge.className = 'status-badge error';
+  } else {
+    badge.textContent = configured ? 'AI 已配置 · 未测试' : 'AI 未配置 · 本地模式';
+    badge.className = 'status-badge neutral';
+  }
 }
-function setApiKeyVisibility(visible) {
-  const input = $('#settingApiKey');
-  const button = $('#toggleApiKey');
-  if (!input || !button) return;
-  input.classList.toggle('secret-input-masked', !visible);
-  button.textContent = visible ? '隐藏' : '显示';
-  button.setAttribute('aria-pressed', String(visible));
-  button.setAttribute('aria-label', visible ? '隐藏 API Key' : '显示 API Key');
-}function loadSettingsForm() {
+function loadSettingsForm() {
   $('#settingBaseUrl').value = state.settings.baseUrl || '';
   $('#settingModel').value = state.settings.model || '';
   $('#settingApiKey').value = state.settings.apiKey || '';
+  setApiKeyVisibility(false);
+  const connection = state.settings.connection;
+  if (isAIConfigured() && connection) setConnectionStatus(connection.ok ? 'success' : 'error', connection.ok ? '连接成功' : (connection.error || '连接失败'), connection.detail || '');
+  else $('#aiConnectionStatus').className = 'ai-connection-status hidden';
   updateAIStatus();
 }
 function saveSettingsForm() {
   state.settings = Object.assign({}, state.settings, { baseUrl: $('#settingBaseUrl').value.trim(), model: $('#settingModel').value.trim(), apiKey: $('#settingApiKey').value.trim() });
   writeJSON(STORAGE.settings, state.settings);
   updateAIStatus();
-  showToast(isAIConfigured() ? 'AI 设置已保存' : '设置已保存；填写完整后才会调用 AI');
+  showToast(isAIConfigured() ? 'AI 设置已保存，正在测试连接' : '设置已保存；填写完整后才会调用 AI');
+  if (isAIConfigured()) testAIConnection();
 }
 function exportData() {
   const payload = { version: 1, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, settings: { baseUrl: state.settings.baseUrl, model: state.settings.model } };
@@ -1460,7 +1723,7 @@ async function handleClick(event) {
     return;
   }
   const wordButton = event.target.closest('[data-article-word]');
-  if (wordButton) { if (state.justSelectedText) return; openWordDrawer(wordButton.dataset.articleWord, Number(wordButton.dataset.sentenceIndex)); return; }
+  if (wordButton) { openWordDrawer(wordButton.dataset.articleWord, Number(wordButton.dataset.sentenceIndex)); return; }
   const courseButton = event.target.closest('[data-course-id]');
   if (courseButton && courseButton.dataset.courseId) {
     const course = findCourse(courseButton.dataset.courseId);
@@ -1514,6 +1777,7 @@ async function handleClick(event) {
   else if (action === 'submit-practice') submitPractice(lessonList.find(item => item.id === state.progress.lastLessonId));
   else if (action === 'reset-practice') resetPractice(lessonList.find(item => item.id === state.progress.lastLessonId));
   else if (action === 'play-video') { const src = actionButton.dataset.videoSrc; actionButton.outerHTML = `<div class="video-frame"><iframe src="${src}" loading="lazy" allowfullscreen title="${escapeHtml(actionButton.dataset.videoTitle || '视频课程')}"></iframe></div>`; }
+  else if (action === 'stop-generation') stopArticleGeneration();
   else if (action === 'regenerate-article') generateArticle();
   else if (action === 'open-reading-settings') { $('#articleControls').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#articleGrammar').focus(); }
   else if (action === 'toggle-all-translations') toggleAllTranslations();
@@ -1525,7 +1789,8 @@ async function handleClick(event) {
   else if (action === 'export-data') exportData();
   else if (action === 'import-data') $('#importFile').click();
   else if (action === 'clear-data') clearLearningData();
-  else if (action === 'clear-ai-settings') { state.settings.apiKey = ''; $('#settingApiKey').value = ''; writeJSON(STORAGE.settings, state.settings); updateAIStatus(); showToast('API Key 已清空'); }
+  else if (action === 'test-ai-connection') testAIConnection();
+  else if (action === 'clear-ai-settings') { state.settings.apiKey = ''; state.settings.connection = null; $('#settingApiKey').value = ''; $('#aiConnectionStatus').className = 'ai-connection-status hidden'; writeJSON(STORAGE.settings, state.settings); updateAIStatus(); showToast('API Key 已清空'); }
 }
 
 function bindEvents() {
