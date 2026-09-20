@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="零基础英语语法学习、文章阅读与生词记忆">
   <title>英语起步课 · 零基础 A1 学习站</title>
-  <link rel="stylesheet" href="styles.css?v=20260920-mobile-selection">
+  <link rel="stylesheet" href="styles.css?v=20260920-selection-guide">
 </head>
 <body>
   <div class="app-shell">
@@ -133,6 +133,12 @@
           <div class="generation-status-copy"><span class="stream-dot"></span><strong id="generationStatusText">等待 AI 响应…</strong></div>
           <div class="generation-status-actions"><button id="stopGenerationButton" class="secondary-button small" type="button" data-action="stop-generation">停止生成</button><button id="retryGenerationButton" class="primary-button small hidden" type="button" data-action="regenerate-article">重新生成</button></div>
         </div>
+        <div class="selection-guide" role="note">
+          <strong>想查看本句中文或语法？</strong>
+          <span><b>电脑：</b>拖动选中同一句中的文字</span>
+          <span><b>手机：</b>长按句中文字约 0.5 秒</span>
+          <small>松开后底部会弹出按钮，再选择“显示本句中文”或“显示本句语法”。</small>
+        </div>
         <div class="reading-workspace">
           <article class="article-paper" id="articlePaper">
             <div class="article-empty">
@@ -231,6 +237,6 @@
 
   <script src="cet4-words.js" defer></script>
   <script src="videos.js" defer></script>
-  <script src="app.js?v=20260920-mobile-selection" defer></script>
+  <script src="app.js?v=20260920-selection-guide" defer></script>
 </body>
 </html>

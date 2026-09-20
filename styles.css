@@ -517,3 +517,15 @@ img, iframe, video, select, textarea, input { max-width: 100%; }
   #sentenceTools { bottom: max(10px, env(safe-area-inset-bottom)); width: calc(100% - 20px); max-height: 56vh; padding: 15px; border-radius: 18px; }
   .sentence-tools-actions { grid-template-columns: 1fr; }
 }
+
+
+/* Reading gesture guide */
+.selection-guide { display: grid; grid-template-columns: auto minmax(180px, 1fr) minmax(180px, 1fr); gap: 8px 18px; align-items: center; margin: -3px 0 18px; padding: 13px 16px; border: 1px solid #cfe1d7; border-radius: 14px; background: #edf7f1; color: #3d6050; font-size: 13px; }
+.selection-guide strong { color: #1f5d43; font-size: 14px; }
+.selection-guide span { min-width: 0; }
+.selection-guide b { color: #1f5d43; }
+.selection-guide small { grid-column: 2 / -1; color: #597065; font-size: 12px; line-height: 1.55; }
+@media (max-width: 860px) {
+  .selection-guide { grid-template-columns: 1fr; gap: 6px; margin-bottom: 14px; }
+  .selection-guide small { grid-column: auto; }
+}
