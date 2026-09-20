@@ -1294,7 +1294,7 @@ function renderArticle(article) {
       if (cueSet.has(key) || cueSet.has(token.text.toLowerCase())) classes.push('grammar-cue');
       if (marked[key]) classes.push('marked');
       if (savedKeys.has(key)) classes.push('saved');
-      return `<button class="${classes.join(' ')}" type="button" data-article-word="${escapeHtml(token.text)}" data-sentence-index="${sentenceIndex}">${escapeHtml(token.text)}</button>`;
+      return `<span class="${classes.join(' ')}" role="button" tabindex="0" data-article-word="${escapeHtml(token.text)}" data-sentence-index="${sentenceIndex}">${escapeHtml(token.text)}</span>`;
     }).join('');
     const translationVisible = view.allTranslations || view.sentenceTranslations[sentenceIndex];
     const grammarVisible = view.allGrammar || view.sentenceGrammar[sentenceIndex];
@@ -1335,6 +1335,33 @@ function clearSelectedSentence() {
   renderSentenceTools();
 }
 let sentenceSelectionTimer = null;
+let sentencePressTimer = null;
+let sentencePressStart = null;
+function cancelSentenceLongPress() {
+  clearTimeout(sentencePressTimer);
+  sentencePressTimer = null;
+  sentencePressStart = null;
+}
+function beginSentenceLongPress(event) {
+  if (event.pointerType === 'mouse' || event.button !== 0) return;
+  const sentence = sentenceElementFromNode(event.target);
+  if (!sentence) return;
+  sentencePressStart = { x: event.clientX, y: event.clientY };
+  clearTimeout(sentencePressTimer);
+  sentencePressTimer = setTimeout(() => {
+    sentencePressTimer = null;
+    sentencePressStart = null;
+    state.justSelectedText = true;
+    clearTimeout(state.justSelectedTextTimer);
+    state.justSelectedTextTimer = setTimeout(() => { state.justSelectedText = false; }, 800);
+    selectSentence(Number(sentence.dataset.articleSentence));
+  }, 550);
+}
+function moveSentenceLongPress(event) {
+  if (!sentencePressStart) return;
+  const distance = Math.hypot(event.clientX - sentencePressStart.x, event.clientY - sentencePressStart.y);
+  if (distance > 10) cancelSentenceLongPress();
+}
 function selectSentenceFromSelection() {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || !selection.rangeCount) return;
@@ -2138,6 +2165,19 @@ function bindEvents() {
   $('#articleGrammar').addEventListener('change', updateReadingVideo);
   $('#importFile').addEventListener('change', event => { const file = event.target.files[0]; if (file) importData(file); event.target.value = ''; });
   $('#wordDrawer').addEventListener('click', event => { if (event.target === $('#wordDrawer')) closeWordDrawer(); });
+  $('#articlePaper').addEventListener('keydown', event => {
+    const wordButton = event.target.closest('[data-article-word]');
+    if (!wordButton || !['Enter', ' '].includes(event.key)) return;
+    event.preventDefault();
+    openWordDrawer(wordButton.dataset.articleWord, Number(wordButton.dataset.sentenceIndex));
+  });
+  $('#articlePaper').addEventListener('pointerdown', beginSentenceLongPress);
+  $('#articlePaper').addEventListener('pointermove', moveSentenceLongPress);
+  $('#articlePaper').addEventListener('pointerup', cancelSentenceLongPress);
+  $('#articlePaper').addEventListener('pointercancel', cancelSentenceLongPress);
+  $('#articlePaper').addEventListener('contextmenu', event => {
+    if (state.justSelectedText || sentencePressTimer) event.preventDefault();
+  });
   $('#articlePaper').addEventListener('mouseup', scheduleSentenceSelection);
   $('#articlePaper').addEventListener('touchend', scheduleSentenceSelection);
   document.addEventListener('selectionchange', scheduleSentenceSelection);
