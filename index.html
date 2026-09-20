@@ -128,6 +128,10 @@
           <label>文章主题<select id="articleTopic"><option value="life">日常生活</option><option value="school">校园学习</option><option value="family">家庭朋友</option><option value="travel">旅行见闻</option><option value="hobby">兴趣爱好</option></select></label>
           <button class="primary-button" type="submit"><span id="generateButtonLabel">生成文章</span></button>
         </form>
+        <div id="generationStatus" class="generation-status hidden" aria-live="polite">
+          <div class="generation-status-copy"><span class="stream-dot"></span><strong id="generationStatusText">等待 AI 响应…</strong></div>
+          <div class="generation-status-actions"><button id="stopGenerationButton" class="secondary-button small" type="button" data-action="stop-generation">停止生成</button><button id="retryGenerationButton" class="primary-button small hidden" type="button" data-action="regenerate-article">重新生成</button></div>
+        </div>
         <div class="reading-workspace">
           <article class="article-paper" id="articlePaper">
             <div class="article-empty">
@@ -187,7 +191,8 @@
             <label>模型名称<input id="settingModel" type="text" placeholder="填写你的服务商支持的模型名" autocomplete="off"></label>
             <label>API Key<span class="secret-input-wrap"><input id="settingApiKey" class="secret-input secret-input-masked" type="text" placeholder="sk-..." autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text" aria-label="API Key"><button id="toggleApiKey" class="secret-toggle" type="button" data-action="toggle-api-key" aria-pressed="false" aria-label="显示 API Key">显示</button></span></label>
             <p class="form-note">浏览器直连需要服务商允许 CORS。公开网站不要共用同一把 Key。</p>
-            <div class="form-actions"><button class="primary-button" type="submit">保存设置</button><button class="secondary-button" type="button" data-action="clear-ai-settings">清空 Key</button></div>
+            <div id="aiConnectionStatus" class="ai-connection-status hidden" role="status"></div>
+            <div class="form-actions"><button class="primary-button" type="submit">保存设置</button><button id="testAiConnectionButton" class="secondary-button" type="button" data-action="test-ai-connection">测试连接</button><button class="secondary-button" type="button" data-action="clear-ai-settings">清空 Key</button></div>
           </form>
           <div class="settings-card">
             <div class="card-heading"><span class="card-icon">DB</span><div><h2>学习数据备份</h2><p>课程进度、生词本和文章记录都保存在本机。</p></div></div>
