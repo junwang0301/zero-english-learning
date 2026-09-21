@@ -82,12 +82,15 @@ async function generateAIQuestions(topic, level, nonce = 0) {
   ];
   let content = '';
   let lastChars = 0;
+  let streamStarted = false;
   try {
     content = await callAIStream(messages, 0.45, (delta, accumulated) => {
+      if (!streamStarted) { streamStarted = true; setLoading(false); }
       const count = accumulated.length;
       if (count - lastChars >= 16) { lastChars = count; practiceStreamStatus('AI \u6b63\u5728\u751f\u6210 8 \u9053\u9898\u2026', count); }
     });
   } catch (error) {
+    setLoading(false);
     practiceStreamStatus('\u5f53\u524d\u670d\u52a1\u4e0d\u652f\u6301\u6d41\u5f0f\u8f93\u51fa\uff0c\u6b63\u5728\u5207\u6362\u666e\u901a\u6a21\u5f0f\u2026');
     content = await callAI(messages, 0.45);
   }
@@ -108,6 +111,7 @@ async function startGrammarPractice(forceNew = false) {
   if (!topic) return;
   if (isAIConfigured()) {
     setPracticeButtonsBusy(true);
+    setLoading(true, forceNew ? 'AI \u6b63\u5728\u8fde\u63a5\uff0c\u51c6\u5907\u66f4\u6362\u9898\u76ee\u2026' : 'AI \u6b63\u5728\u8fde\u63a5\uff0c\u51c6\u5907\u751f\u6210\u9898\u76ee\u2026');
     practiceStreamStatus(forceNew ? 'AI \u6b63\u5728\u751f\u6210\u4e00\u7ec4\u65b0\u9898\u2026' : 'AI \u6b63\u5728\u751f\u6210\u8bed\u6cd5\u4e13\u9879\u9898\u2026');
     const key = `${topic.id}:${level}`;
     const cached = state.practice.cache[key] || [];
@@ -119,7 +123,7 @@ async function startGrammarPractice(forceNew = false) {
       if (cached.length) setGrammarSession(topic, level, cached[0], 'CACHE');
       else setGrammarSession(topic, level, practiceQuestionsFromTopic(topic), 'LOCAL');
       showToast(forceNew ? 'AI ????????????' : 'AI ????????????????');
-    } finally { setPracticeButtonsBusy(false); }
+    } finally { setLoading(false); setPracticeButtonsBusy(false); }
   } else {
     setGrammarSession(topic, level, practiceQuestionsFromTopic(topic), 'LOCAL');
   }
@@ -276,6 +280,7 @@ async function startWritingPractice() {
   let task = localWritingTask(level, theme);
   if (isAIConfigured()) {
     setPracticeButtonsBusy(true);
+    setLoading(true, 'AI \u6b63\u5728\u8fde\u63a5\uff0c\u51c6\u5907\u751f\u6210\u5199\u4f5c\u9898\u76ee\u2026');
     practiceStreamStatus('AI \u6b63\u5728\u751f\u6210\u5199\u4f5c\u9898\u76ee\u2026');
     try {
       const messages = [
@@ -284,12 +289,15 @@ async function startWritingPractice() {
       ];
       let content = '';
       let lastChars = 0;
+      let streamStarted = false;
       try {
         content = await callAIStream(messages, 0.6, (delta, accumulated) => {
+          if (!streamStarted) { streamStarted = true; setLoading(false); }
           const count = accumulated.length;
           if (count - lastChars >= 16) { lastChars = count; practiceStreamStatus('AI \u6b63\u5728\u751f\u6210\u5199\u4f5c\u9898\u76ee\u2026', count); }
         });
       } catch (error) {
+        setLoading(false);
         practiceStreamStatus('\u5f53\u524d\u670d\u52a1\u4e0d\u652f\u6301\u6d41\u5f0f\u8f93\u51fa\uff0c\u6b63\u5728\u5207\u6362\u666e\u901a\u6a21\u5f0f\u2026');
         content = await callAI(messages, 0.6);
       }
@@ -300,7 +308,7 @@ async function startWritingPractice() {
         task = Object.assign(task, parsed);
       }
     } catch (error) { showToast('AI \u51fa\u9898\u5931\u8d25\uff0c\u5df2\u4f7f\u7528\u672c\u5730\u9898\u76ee'); }
-    finally { setPracticeButtonsBusy(false); }
+    finally { setLoading(false); setPracticeButtonsBusy(false); }
   }
   state.writing.level = level; state.writing.theme = theme; state.writing.lastRecord = null; state.writing.draft = { task, answer: '', createdAt: Date.now() };
   savePracticeData(); renderPractice();
