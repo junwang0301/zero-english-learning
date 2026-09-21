@@ -5,7 +5,10 @@ const STORAGE = {
   progress: 'english-learning:v1:progress',
   vocabulary: 'english-learning:v1:vocabulary',
   articles: 'english-learning:v1:articles',
-  wordData: 'english-learning:v1:word-data'
+  wordData: 'english-learning:v1:word-data',
+  practice: 'english-learning:v1:practice',
+  wrongBook: 'english-learning:v1:wrong-book',
+  writing: 'english-learning:v1:writing'
 };
 const DAY = 24 * 60 * 60 * 1000;
 const REVIEW_INTERVALS = [0, 1, 3, 7, 14, 30];
@@ -496,12 +499,16 @@ const state = {
   currentArticle: null,
   selectedWord: null,
   review: { queue: [], index: 0, revealed: false, dueOnly: true },
-  metadataEnrichment: null
+  metadataEnrichment: null,
+  practice: null,
+  wrongBook: null,
+  writing: null
 };
 
 const LEVEL_ORDER = ['A1', 'A2', 'B1', 'CET4'];
 const LEVEL_LABELS = { A1: 'A1 零基础', A2: 'A2 基础', B1: 'B1 进阶', CET4: 'CET-4 四级' };
 function courseLevel(item) {
+  if (item.level) return item.level;
   if (!item.advanced) return item.num <= 10 ? 'A1' : 'A2';
   return item.num <= 25 ? 'B1' : 'CET4';
 }
@@ -543,14 +550,16 @@ function setGlobalLevel(level) {
   showToast(`已切换到 ${LEVEL_LABELS[level]}`);
 }
 function courseItems() {
-  return lessonList.concat(advancedModules.map(item => Object.assign({}, item, { advanced: true })));
+  const micro = typeof grammarTopics !== 'undefined' ? grammarTopics : [];
+  return lessonList.concat(advancedModules.map(item => Object.assign({}, item, { advanced: true })), micro);
 }
 function findCourse(id) {
   return courseItems().find(item => item.id === id);
 }
 function lessonByOffset(id, offset) {
-  const index = lessonList.findIndex(item => item.id === id);
-  return lessonList[index + offset] || null;
+  const items = courseItems();
+  const index = items.findIndex(item => item.id === id);
+  return items[index + offset] || null;
 }
 function isAIConfigured() {
   return Boolean(state.settings.baseUrl && state.settings.model && state.settings.apiKey);
@@ -591,7 +600,7 @@ function showView(view) {
 function renderMobileNav() {
   const nav = $('#mobileNav');
   nav.innerHTML = [
-    ['home', '学习首页'], ['grammar', '语法课堂'], ['reading', '阅读实验室'],
+    ['home', '学习首页'], ['grammar', '语法课堂'], ['practice', '练习中心'], ['reading', '阅读实验室'],
     ['vocabulary', '我的单词本'], ['settings', 'AI 与数据']
   ].map(item => `<button class="nav-item" type="button" data-view="${item[0]}">${item[1]}</button>`).join('');
 }
@@ -599,14 +608,15 @@ function updateStats() {
   const done = completedLessonCount();
   const due = dueWords().length;
   const wordCount = Object.keys(state.vocabulary).length;
-  $('#statLessonProgress').textContent = `${done} / ${lessonList.length}`;
-  $('#statLessonBar').style.width = `${Math.round(done / lessonList.length * 100)}%`;
+  const grammarTotal = Math.max(1, courseItems().length);
+  $('#statLessonProgress').textContent = `${done} / ${grammarTotal}`;
+  $('#statLessonBar').style.width = `${Math.round(done / grammarTotal * 100)}%`;
   $('#statWordCount').textContent = wordCount;
   $('#statDueCount').textContent = due;
   $('#navDueCount').textContent = due;
   $('#navDueCount').classList.toggle('hidden', due === 0);
   $('#sidebarDueCount').textContent = due;
-  const ringPercent = Math.round(done / lessonList.length * 100);
+  const ringPercent = Math.round(done / grammarTotal * 100);
   $('#grammarProgressRing').style.background = `conic-gradient(var(--green) ${ringPercent}%, #e5e9e4 ${ringPercent}%)`;
   $('#grammarProgressRing strong').textContent = `${ringPercent}%`;
   const week = new Date(Date.now() - 7 * DAY).toISOString().slice(0, 10);
@@ -643,9 +653,9 @@ function renderLessonGrid() {
     const done = !item.advanced && state.progress.completed[item.id] && state.progress.completed[item.id].completed;
     const score = done ? ` · ${state.progress.completed[item.id].score}%` : '';
     return `<button class="lesson-card ${done ? 'done' : ''}" type="button" data-course-id="${item.id}">
-      <div class="lesson-card-top"><span class="lesson-number">${String(item.num).padStart(2, '0')}</span><span class="lesson-status">${item.advanced ? '进阶课程' : (done ? '已完成' + score : '未完成')}</span></div>
+      <div class="lesson-card-top"><span class="lesson-number">${String(item.num).padStart(2, '0')}</span><span class="lesson-status">${item.microTopic ? '微专题' : (item.advanced ? '进阶课程' : (done ? '已完成' + score : '未完成'))}</span></div>
       <h3>${escapeHtml(item.title)}</h3><span class="subtitle">${escapeHtml(item.subtitle)}</span><p>${escapeHtml(item.summary)}</p>
-      <footer>${item.advanced ? '生成对应难度文章' : '8 道练习 · 70% 完成'}</footer>
+      <footer>${item.microTopic ? '5 道基础题 · AI 专项' : (item.advanced ? '生成对应难度文章' : '8 道练习 · 70% 完成')}</footer>
     </button>`;
   }).join('') || '<div class="empty-state"><h2>当前难度暂无课程</h2><p>请切换其他难度。</p></div>';
 }
@@ -712,13 +722,15 @@ function renderLessonPractice(lesson) {
     <div class="form-actions"><button class="primary-button" type="button" data-action="submit-practice" ${session.submitted ? 'disabled' : ''}>${isAIConfigured() ? '提交并交给 AI 批改' : '提交练习'}</button><button class="secondary-button" type="button" data-action="reset-practice">重做本课</button></div>
   </div>`;
 }function videoForCourse(courseId) {
+  const course = findCourse(courseId);
+  if (course && course.video) return course.video;
   return typeof lessonVideos !== 'undefined' ? lessonVideos[courseId] : null;
 }
 function renderLessonVideoHtml(courseId) {
   const video = videoForCourse(courseId);
   if (!video) return '';
   const player = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(video.bvid)}&page=${video.page || 1}&high_quality=1&danmaku=0`;
-  return `<article class="content-card video-lesson-card"><div class="video-heading"><div><span class="eyebrow">视频授课</span><h2>${escapeHtml(video.title)}</h2></div><span class="video-teacher">${escapeHtml(video.teacher)}</span></div><button class="video-launch" type="button" data-action="play-video" data-video-src="${player}" data-video-title="${escapeHtml(video.title)}"><span>▶</span><strong>点击播放视频课程</strong><small>加载 B 站官方播放器</small></button><p class="video-note">${escapeHtml(video.note || '配套语法讲解')}</p><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站打开原视频 →</a></article>`;
+  return `<article class="content-card video-lesson-card"><div class="video-heading"><div><span class="eyebrow">视频授课</span><h2>${escapeHtml(video.title)}</h2></div><span class="video-teacher">${escapeHtml(video.teacher)}</span></div><button class="video-launch" type="button" data-action="play-video" data-video-src="${player}" data-video-title="${escapeHtml(video.title)}"><span>▶</span><strong>点击播放视频课程</strong><small>加载 B 站官方播放器 · 倍速请在 B 站播放器内设置（最高 2 倍速）</small></button><p class="video-note">${escapeHtml(video.note || '配套语法讲解')}</p><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站打开原视频 →</a></article>`;
 }
 function updateReadingVideo() {
   const panel = $('#lessonVideoPanel');
@@ -728,14 +740,14 @@ function updateReadingVideo() {
   if (!video) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
   const player = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(video.bvid)}&page=${video.page || 1}&high_quality=1&danmaku=0`;
   panel.classList.remove('hidden');
-  panel.innerHTML = `<span class="eyebrow">视频授课</span><h3>${escapeHtml(video.title)}</h3><p>${escapeHtml(video.note || '')}</p><small>来源：${escapeHtml(video.teacher)}</small><button class="video-launch compact" type="button" data-action="play-video" data-video-src="${player}" data-video-title="${escapeHtml(video.title)}"><span>▶</span><strong>点击播放视频课程</strong><small>加载 B 站官方播放器</small></button><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站观看 →</a>`;
+  panel.innerHTML = `<span class="eyebrow">视频授课</span><h3>${escapeHtml(video.title)}</h3><p>${escapeHtml(video.note || '')}</p><small>来源：${escapeHtml(video.teacher)}</small><button class="video-launch compact" type="button" data-action="play-video" data-video-src="${player}" data-video-title="${escapeHtml(video.title)}"><span>▶</span><strong>点击播放视频课程</strong><small>加载 B 站官方播放器 · 倍速请在 B 站播放器内设置（最高 2 倍速）</small></button><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站观看 →</a>`;
 }
 function renderLessonDetail(lesson) {
   const done = state.progress.completed[lesson.id] && state.progress.completed[lesson.id].completed;
   const previous = lessonByOffset(lesson.id, -1);
   const next = lessonByOffset(lesson.id, 1);
   $('#lessonDetail').innerHTML = `
-    <div class="lesson-detail-header"><div><span class="eyebrow">A1 · LESSON ${String(lesson.num).padStart(2, '0')}</span><h1 id="lessonTitle">${escapeHtml(lesson.title)}</h1><span class="subtitle">${escapeHtml(lesson.subtitle)}</span><p>${escapeHtml(lesson.summary)}</p></div><div class="lesson-header-badge"><strong>${lesson.num}</strong><span>${done ? '已完成' : '学习中'}</span></div></div>
+    <div class="lesson-detail-header"><div><span class="eyebrow">${courseLevel(lesson)} · LESSON ${String(lesson.num).padStart(2, '0')}</span><h1 id="lessonTitle">${escapeHtml(lesson.title)}</h1><span class="subtitle">${escapeHtml(lesson.subtitle)}</span><p>${escapeHtml(lesson.summary)}</p></div><div class="lesson-header-badge"><strong>${lesson.num}</strong><span>${done ? '已完成' : '学习中'}</span></div></div>
     <div class="lesson-content-grid">
       <div class="lesson-main-column">
         ${renderLessonVideoHtml(lesson.id)}<article class="content-card"><h2>核心结构</h2><div class="formula-block">${escapeHtml(lesson.formula)}</div><h3>使用规则</h3><ul class="rule-list">${lesson.rules.map(rule => `<li><strong>${escapeHtml(rule[0])}</strong>：${escapeHtml(rule[1])}</li>`).join('')}</ul></article>
@@ -750,7 +762,7 @@ function renderLessonDetail(lesson) {
     </div>`;
 }
 function openLesson(id) {
-  const lesson = lessonList.find(item => item.id === id);
+  const lesson = findCourse(id);
   if (!lesson) return;
   state.progress.lastLessonId = id;
   writeJSON(STORAGE.progress, state.progress);
@@ -1303,7 +1315,7 @@ function renderArticle(article) {
   }).join(' ')}</p>`).join('');
   const totalWords = article.sentences.reduce((sum, sentence) => sum + (sentence.en.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || []).length, 0);
   $('#articleWordCount').textContent = `${totalWords} 个词`;
-  $('#articlePaper').innerHTML = `<header class="article-header"><span class="eyebrow">${escapeHtml(article.level)} · ${sourceLabel}</span><h2>${escapeHtml(article.title)}</h2><div class="article-zh-title ${view.allTranslations ? '' : 'hidden'}">${escapeHtml(article.titleZh || '')}</div><div class="article-meta"><span>目标语法：${escapeHtml(article.grammarFocus || course.title)}</span><span>${article.sentences.length} 句 · ${paragraphs.length} 段</span>${typeLabel ? `<span>${typeLabel}</span>` : ''}${coverageLabel ? `<span>${coverageLabel}</span>` : ''}<span>点击单词查词典，点击句子单独切换</span></div></header><div class="article-body">${body}</div><div class="article-toolbar"><button class="secondary-button" type="button" data-action="toggle-all-translations">${view.allTranslations ? '隐藏全文中文' : '显示全文中文'}</button><button class="secondary-button" type="button" data-action="toggle-all-grammar">${view.allGrammar ? '隐藏全部语法' : '显示全部语法'}</button>${metadataStatus}<button class="primary-button" type="button" data-action="regenerate-article">换一篇</button><button class="text-button" type="button" data-action="open-reading-settings">调整生成条件</button></div>`;
+  $('#articlePaper').innerHTML = `<header class="article-header"><span class="eyebrow">${escapeHtml(article.level)} · ${sourceLabel}</span><h2>${escapeHtml(article.title)}</h2><div class="article-zh-title ${view.allTranslations ? '' : 'hidden'}">${escapeHtml(article.titleZh || '')}</div><div class="article-meta"><span>目标语法：${escapeHtml(article.grammarFocus || course.title)}</span><span>${article.sentences.length} 句 · ${paragraphs.length} 段</span>${typeLabel ? `<span>${typeLabel}</span>` : ''}${coverageLabel ? `<span>${coverageLabel}</span>` : ''}<span>点击单词查词典，点击句子单独切换</span></div></header><div class="article-body">${body}</div><div class="article-toolbar"><button class="secondary-button" type="button" data-action="toggle-all-translations">${view.allTranslations ? '隐藏全文中文' : '显示全文中文'}</button><button class="secondary-button" type="button" data-action="toggle-all-grammar">${view.allGrammar ? '隐藏全部语法' : '显示全部语法'}</button><button class="secondary-button" type="button" data-action="refresh-article-metadata">强制重新获取中文和语法</button>${metadataStatus}<button class="primary-button" type="button" data-action="regenerate-article">换一篇</button><button class="text-button" type="button" data-action="open-reading-settings">调整生成条件</button></div>`;
   renderSentenceTools();
 }
 function renderSentenceTools() {
@@ -1436,6 +1448,27 @@ function stopArticleGeneration() {
     setGenerationStatus('已停止生成，已保留当前内容', { retry: true });
   } else {
     setGenerationStatus('已停止生成', { retry: true });
+  }
+}
+async function refreshArticleMetadata() {
+  const article = state.currentArticle;
+  const course = article && findCourse(article.grammarId);
+  if (!article || !course) return;
+  if (!isAIConfigured()) { showToast('请先在“AI 与数据”中配置接口、模型和 API Key'); return; }
+  if (state.metadataEnrichment) { showToast('当前正在补充，请稍候'); return; }
+  if (!confirm('将重新获取本篇所有句子的中文和语法，并覆盖当前内容。是否继续？')) return;
+  try {
+    await enrichArticleWithRetry(article, course, null);
+    saveArticle(article);
+    renderArticle(article);
+    setGenerationStatus('');
+    showToast('已重新获取中文和语法');
+  } catch (error) {
+    state.metadataEnrichment = null;
+    saveArticle(article);
+    renderArticle(article);
+    setGenerationStatus('重新获取失败，旧内容已保留', {});
+    showToast('重新获取失败：' + error.message);
   }
 }
 async function enrichCurrentArticle() {
@@ -1960,7 +1993,7 @@ function exportData() {
   if (includeApiKey && !confirm('备份将包含明文 API Key。不要把此文件分享给他人。是否继续导出？')) return;
   const settingsBackup = { baseUrl: state.settings.baseUrl, model: state.settings.model };
   if (includeApiKey) settingsBackup.apiKey = state.settings.apiKey;
-  const payload = { version: 2, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, settings: settingsBackup };
+  const payload = { version: 3, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, practice: state.practice || {}, wrongBook: state.wrongBook || [], writing: state.writing || { draft: null, history: [] }, settings: settingsBackup };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -1983,12 +2016,18 @@ function importData(file) {
       state.progress = payload.progress;
       state.vocabulary = payload.vocabulary;
       state.articles = payload.articles;
+      state.practice = payload.practice || {};
+      state.wrongBook = Array.isArray(payload.wrongBook) ? payload.wrongBook : [];
+      state.writing = payload.writing || { draft: null, history: [] };
       if (payload.settings && payload.settings.baseUrl) state.settings.baseUrl = payload.settings.baseUrl;
       if (payload.settings && payload.settings.model) state.settings.model = payload.settings.model;
       if (payload.settings && payload.settings.apiKey) state.settings.apiKey = payload.settings.apiKey;
       writeJSON(STORAGE.progress, state.progress);
       writeJSON(STORAGE.vocabulary, state.vocabulary);
       writeJSON(STORAGE.articles, state.articles);
+      writeJSON(STORAGE.practice, state.practice);
+      writeJSON(STORAGE.wrongBook, state.wrongBook);
+      writeJSON(STORAGE.writing, state.writing);
       writeJSON(STORAGE.settings, state.settings);
       renderAll();
   renderLevelSwitchers();
@@ -2003,10 +2042,16 @@ function clearLearningData() {
   state.progress = { completed: {}, lastLessonId: '', studyDates: {} };
   state.vocabulary = {};
   state.articles = [];
+  state.practice = {};
+  state.wrongBook = [];
+  state.writing = { draft: null, history: [] };
   state.review = { queue: [], index: 0, revealed: false, dueOnly: true };
   writeJSON(STORAGE.progress, state.progress);
   writeJSON(STORAGE.vocabulary, state.vocabulary);
   writeJSON(STORAGE.articles, state.articles);
+  writeJSON(STORAGE.practice, state.practice);
+  writeJSON(STORAGE.wrongBook, state.wrongBook);
+  writeJSON(STORAGE.writing, state.writing);
   renderAll();
   showToast('学习数据已清空');
 }
@@ -2015,7 +2060,7 @@ function populateArticleSelects() {
   const grammar = $('#articleGrammar');
   if (!grammar) return;
   const selected = grammar.value;
-  grammar.innerHTML = `<optgroup label="A1 基础语法">${lessonList.map(item => `<option value="${item.id}">${String(item.num).padStart(2, '0')} · ${escapeHtml(item.title)}</option>`).join('')}</optgroup><optgroup label="CET-4 四级进阶">${advancedModules.map(item => `<option value="${item.id}">${String(item.num).padStart(2, '0')} · ${escapeHtml(item.title)}</option>`).join('')}</optgroup>`;
+  grammar.innerHTML = `<optgroup label="A1 基础语法">${lessonList.map(item => `<option value="${item.id}">${String(item.num).padStart(2, '0')} · ${escapeHtml(item.title)}</option>`).join('')}</optgroup><optgroup label="CET-4 四级进阶">${advancedModules.map(item => `<option value="${item.id}">${String(item.num).padStart(2, '0')} · ${escapeHtml(item.title)}</option>`).join('')}</optgroup>${typeof grammarTopics !== 'undefined' ? `<optgroup label="语法微专题">${grammarTopics.map(item => `<option value="${item.id}">${escapeHtml(item.title)}</option>`).join('')}</optgroup>` : ''}`;
   if (selected && findCourse(selected)) grammar.value = selected;
 }
 function selectAdvancedModule(id) {
@@ -2111,6 +2156,7 @@ async function handleClick(event) {
   else if (action === 'play-video') { const src = actionButton.dataset.videoSrc; actionButton.outerHTML = `<div class="video-frame"><iframe src="${src}" loading="lazy" allowfullscreen title="${escapeHtml(actionButton.dataset.videoTitle || '视频课程')}"></iframe></div>`; }
   else if (action === 'stop-generation') stopArticleGeneration();
   else if (action === 'enrich-article') enrichCurrentArticle();
+  else if (action === 'refresh-article-metadata') refreshArticleMetadata();
   else if (action === 'regenerate-article') generateArticle();
   else if (action === 'open-reading-settings') { $('#articleControls').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#articleGrammar').focus(); }
   else if (action === 'toggle-all-translations') toggleAllTranslations();
