@@ -98,7 +98,7 @@ async function startGrammarPractice(forceNew = false) {
 function collectGrammarAnswers() {
   const session = state.practice.active;
   if (!session) return;
-  document.querySelectorAll('[data-practice-answer]').forEach(input => { session.answers[input.dataset.practiceAnswer] = input.value; });
+  document.querySelectorAll('[data-practice-answer]').forEach(input => { if (input.type === 'radio') return; session.answers[input.dataset.practiceAnswer] = input.value; });
   document.querySelectorAll('[data-practice-question]').forEach(block => {
     const checked = block.querySelector('input[type="radio"]:checked');
     if (checked) session.answers[block.dataset.practiceQuestion] = checked.value;
