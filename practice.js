@@ -59,7 +59,7 @@ function validPracticeQuestions(value) {
 }
 async function generateAIQuestions(topic, level, nonce = 0) {
   const messages = [
-    { role: 'system', content: '你是英语语法老师。只输出 JSON，不要 Markdown。必须返回 8 道题，题型数量严格为 mcq 2、fill 2、correction 2、translation 2。' },
+    { role: 'system', content: '你是英语语法老师。只输出 JSON，不要 Markdown。必须返回 8 道题，题型数量严格为 mcq 2、fill 2、correction 2、translation 2。 All explanation fields MUST be in Simplified Chinese. Keep questions, options, and answers in English.' },
     { role: 'user', content: `专题：${topic.title}。等级：${level}。本轮标记：${nonce || '首次'}。知识点：${topic.summary}。规则：${topic.rules.map(item => item[1]).join('；')}。请生成与上一轮不同的题目。JSON 结构必须为 {"questions":[{"id":"q1","type":"mcq|fill|correction|translation","prompt":"题目","options":["A","B","C"],"answer":0,"referenceAnswer":"参考答案","explanation":"解析"}]}。选择题必须有 options 和数字 answer。` }
   ];
   const parsed = extractJSON(await callAI(messages, 0.45));
@@ -108,10 +108,7 @@ function localGrammarResults(session) {
   return session.questions.map(question => {
     const answer = session.answers[question.id];
     const correct = question.type === 'mcq' ? Number(answer) === Number(question.answer) : practiceNormalize(answer) === practiceNormalize(question.referenceAnswer);
-    const explanation = question.explanation ? ' ' + question.explanation : '';
-    const yes = '\u56de\u7b54\u6b63\u786e\u3002';
-    const ref = '\u53c2\u8003\u7b54\u6848\uff1a';
-    return { id: question.id, correct, feedback: correct ? (yes + explanation).trim() : (ref + (question.referenceAnswer || '') + explanation).trim() };
+    return { id: question.id, correct, feedback: localFeedbackText(correct, question.referenceAnswer, question.explanation) };
   });
 }
 async function gradeGrammarSession(session) {
@@ -129,7 +126,7 @@ async function gradeGrammarSession(session) {
     };
   });
   const messages = [
-    { role: 'system', content: 'You are an English grammar teacher. Return JSON only, without Markdown. Grade each answer. For multiple-choice questions, use options and studentAnswer; studentAnswer is already resolved to the selected option text. Return exactly {"score":0-100,"results":[{"id":"q1","correct":true,"feedback":"reason and correction"}]}.' },
+    { role: 'system', content: 'You are an English grammar teacher. Return JSON only, without Markdown. Grade each answer. For multiple-choice questions, use options and studentAnswer; studentAnswer is already resolved to the selected option text. All feedback strings MUST be in Simplified Chinese. Keep English only in question text, answers, and corrected English examples. Return exactly {"score":0-100,"results":[{"id":"q1","correct":true,"feedback":"..."}]}.' },
     { role: 'user', content: JSON.stringify(payload) }
   ];
   const parsed = extractJSON(await callAI(messages, 0.2));
@@ -142,10 +139,11 @@ async function gradeGrammarSession(session) {
     const hasValidAIResult = Boolean(item && (typeof rawCorrect === 'boolean' || ['true', 'false'].includes(String(rawCorrect).toLowerCase())));
     const aiCorrect = hasValidAIResult && (rawCorrect === true || String(rawCorrect).toLowerCase() === 'true');
     const aiFeedback = item && typeof item.feedback === 'string' ? item.feedback.trim() : '';
+    const safeFeedback = chineseFeedbackOrFallback(aiFeedback, local.feedback);
     const negativeFeedback = /\u5224\u9519|\u9519\u8bef|\u4e0d\u6b63\u786e|\u7b54\u9519|wrong|incorrect/i.test(aiFeedback);
     const positiveFeedback = /\u6b63\u786e|\u7b54\u5bf9|correct|right/i.test(aiFeedback) && !/\u4e0d|wrong|incorrect/i.test(aiFeedback);
     const contradictsLocal = question.type === 'mcq' && aiFeedback && ((local.correct && negativeFeedback) || (!local.correct && positiveFeedback));
-    const feedback = question.type === 'mcq' ? (contradictsLocal || !aiFeedback ? local.feedback : aiFeedback) : (aiFeedback || local.feedback);
+    const feedback = question.type === 'mcq' ? (contradictsLocal ? local.feedback : safeFeedback) : safeFeedback;
     return { id: question.id, correct: question.type === 'mcq' ? local.correct : (hasValidAIResult ? aiCorrect : local.correct), feedback };
   });
 }
@@ -261,14 +259,18 @@ async function submitWritingPractice() {
   const draft = state.writing.draft;
   if (!draft) return;
   draft.answer = $('#writingDraft') ? $('#writingDraft').value : draft.answer;
-  if (!draft.answer.trim()) { showToast('请先完成写作内容'); return; }
-  let feedback = { score: null, dimensions: {}, errors: [], polishedEssay: draft.answer, modelEssay: draft.task.modelEssay, usefulPhrases: draft.task.usefulPhrases || [], feedback: '已完成本地保存，请对照范文自评语法、结构和词汇。' };
+  if (!draft.answer.trim()) { showToast('\u8bf7\u5148\u5b8c\u6210\u5199\u4f5c\u5185\u5bb9'); return; }
+  let feedback = { score: null, dimensions: {}, errors: [], polishedEssay: draft.answer, modelEssay: draft.task.modelEssay, usefulPhrases: draft.task.usefulPhrases || [], feedback: '\u5df2\u5b8c\u6210\u672c\u5730\u4fdd\u5b58\uff0c\u8bf7\u5bf9\u7167\u8303\u6587\u81ea\u8bc4\u8bed\u6cd5\u3001\u7ed3\u6784\u548c\u8bcd\u6c47\u3002' };
   if (isAIConfigured()) {
-    setLoading(true, 'AI 正在批改写作…');
+    setLoading(true, 'AI \u6b63\u5728\u6279\u6539\u5199\u4f5c\u2026');
     try {
-      const parsed = extractJSON(await callAI([{ role: 'system', content: '你是英语写作老师。只输出 JSON，不要 Markdown。结构为 {"score":0-100,"dimensions":{"content":0-25,"organization":0-25,"grammar":0-25,"vocabulary":0-25},"errors":[{"original":"","corrected":"","reason":""}],"polishedEssay":"","modelEssay":"","usefulPhrases":[""],"feedback":""}。' }, { role: 'user', content: `题目：${draft.task.promptZh}\n要求：${draft.task.requirements}\n学生作文：${draft.answer}` }], 0.3));
-      if (parsed && typeof parsed.score === 'number') feedback = parsed;
-    } catch (error) { showToast('AI 批改失败，已提供本地范文和自评提示'); }
+      const parsed = extractJSON(await callAI([{ role: 'system', content: 'You are an English writing teacher. Return JSON only, without Markdown. All feedback and errors[].reason fields MUST be in Simplified Chinese. Keep English only for original/corrected English examples, polishedEssay, modelEssay, and usefulPhrases. Structure: {"score":0-100,"dimensions":{"content":0-25,"organization":0-25,"grammar":0-25,"vocabulary":0-25},"errors":[{"original":"","corrected":"","reason":""}],"polishedEssay":"","modelEssay":"","usefulPhrases":[""],"feedback":""}.' }, { role: 'user', content: '\u9898\u76ee\uff1a' + draft.task.promptZh + '\n\u8981\u6c42\uff1a' + draft.task.requirements + '\n\u5b66\u751f\u4f5c\u6587\uff1a' + draft.answer }], 0.3));
+      if (parsed && typeof parsed.score === 'number') {
+        parsed.feedback = chineseFeedbackOrFallback(parsed.feedback, feedback.feedback);
+        parsed.errors = Array.isArray(parsed.errors) ? parsed.errors.map(error => Object.assign({}, error, { reason: chineseFeedbackOrFallback(error.reason, '\u8bf7\u68c0\u67e5\u6b64\u5904\u8bed\u6cd5\u6216\u8868\u8fbe\u3002') })) : [];
+        feedback = parsed;
+      }
+    } catch (error) { showToast('AI \u6279\u6539\u5931\u8d25\uff0c\u5df2\u63d0\u4f9b\u672c\u5730\u8303\u6587\u548c\u81ea\u8bc4\u63d0\u793a'); }
     finally { setLoading(false); }
   }
   const record = { id: uid(), level: draft.task.level, theme: draft.task.theme, promptTitle: draft.task.promptTitle, promptZh: draft.task.promptZh, answer: draft.answer, feedback, createdAt: Date.now(), score: feedback.score };

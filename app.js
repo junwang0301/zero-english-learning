@@ -579,7 +579,23 @@ function touchStudy() {
   writeJSON(STORAGE.progress, state.progress);
 }
 function normalizeAnswer(value) {
-  return String(value || '').toLowerCase().replace(/[.,!?;:"“”‘’]/g, '').replace(/\s+/g, ' ').trim();
+  return String(value || '').toLowerCase().replace(/[\u002e\u002c\u0021\u003f\u003b\u003a\u0022\u0027\u2018\u2019\u201c\u201d]/g, '').replace(/\s+/g, ' ').trim();
+}
+function localFeedbackText(correct, reference, explanation) {
+  const yes = '\u56de\u7b54\u6b63\u786e\u3002';
+  const ref = '\u53c2\u8003\u7b54\u6848\uff1a';
+  const answer = correct ? yes : ref + (reference || '') + '\u3002';
+  return (answer + (explanation ? ' ' + explanation : '')).trim();
+}
+function hasChineseFeedback(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  const chinese = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  const latin = (text.match(/[A-Za-z]/g) || []).length;
+  return chinese >= 2 && chinese >= latin * 0.12;
+}
+function chineseFeedbackOrFallback(value, fallback) {
+  return hasChineseFeedback(value) ? String(value).trim() : fallback;
 }
 function showToast(message) {
   const toast = $('#toast');
@@ -811,20 +827,25 @@ function localPracticeResults(lesson) {
     const accepted = [question.answer].concat(question.accepts || []).map(normalizeAnswer);
     return accepted.includes(normalizeAnswer(session.answers.translations[index])) ? true : null;
   });
-  return { mcq, fill, translations, feedback: { mcq: {}, fill: {}, translations: {} } };
+  const feedback = { mcq: {}, fill: {}, translations: {} };
+  lesson.mcq.forEach((question, index) => { feedback.mcq[index] = localFeedbackText(mcq[index], question.options[question.answer], question.explanation); });
+  lesson.fill.forEach((question, index) => { feedback.fill[index] = localFeedbackText(fill[index], question.answer, question.explanation); });
+  lesson.translations.forEach((question, index) => { feedback.translations[index] = localFeedbackText(translations[index] === true, question.answer, question.explanation); });
+  return { mcq, fill, translations, feedback };
 }
 function applyAIGrades(results, grades) {
   const apply = (type, list) => {
     list.forEach((question, index) => {
       const item = (grades[type] || []).find(entry => Number(entry.index) === index);
-      if (item && typeof item.correct === 'boolean') results[type][index] = item.correct;
-      if (item && item.feedback) results.feedback[type][index] = `AI 批改：${item.feedback}`;
-    });
-    if (type === 'fill') list.forEach((question, index) => {
-      if (results.fill[index] === false && !results.feedback.fill[index]) results.feedback.fill[index] = `参考答案：${question.answer}`;
-    });
-    if (type === 'translations') list.forEach((question, index) => {
-      if (results.translations[index] === false && !results.feedback.translations[index]) results.feedback.translations[index] = `参考答案：${question.answer}`;
+      if (type !== 'mcq' && item && typeof item.correct === 'boolean') results[type][index] = item.correct;
+      if (item && item.feedback) {
+        const aiFeedback = String(item.feedback).trim();
+        const fallback = results.feedback[type][index] || localFeedbackText(false, question.answer || question.referenceAnswer || '', question.explanation);
+        const negative = /\u5224\u9519|\u9519\u8bef|\u4e0d\u6b63\u786e|\u7b54\u9519|wrong|incorrect/i.test(aiFeedback);
+        const positive = /\u6b63\u786e|\u7b54\u5bf9|correct|right/i.test(aiFeedback) && !/\u4e0d|wrong|incorrect/i.test(aiFeedback);
+        const contradicts = type === 'mcq' && ((results[type][index] === true && negative) || (results[type][index] === false && positive));
+        results.feedback[type][index] = hasChineseFeedback(aiFeedback) && !contradicts ? ('AI \u6279\u6539\uff1a' + aiFeedback) : fallback;
+      }
     });
   };
   apply('mcq', results.mcq);
@@ -909,14 +930,18 @@ async function gradeLessonWithAI(lesson) {
     fill: lesson.fill.map((question, index) => ({ index, question: question.q, referenceAnswer: question.answer, requirement: fillRequirement(question), grammarHint: question.hint || '', studentAnswer: session.answers.fill[index] })),
     translations: lesson.translations.map((question, index) => ({ index, chinese: question.zh, referenceAnswer: question.answer, studentAnswer: session.answers.translations[index] }))
   };
-  const prompt = `你是严谨但宽容的英语老师。请批改下面整组练习。选择题只判断学生所选选项；填空题只要符合题目限制、语法和句意就应算对，不必与参考答案逐字相同；翻译题判断语义和语法，合理的不同表达应算对。只返回 JSON，结构为：{"mcq":[{"index":0,"correct":true,"feedback":"简短中文反馈"}],"fill":[{"index":0,"correct":true,"feedback":"简短中文反馈"}],"translations":[{"index":0,"correct":true,"feedback":"简短中文反馈"}]}。每个数组必须覆盖全部题目，feedback 要指出错误原因或改进点。\n${JSON.stringify(payload)}`;
-  const parsed = extractJSON(await callAI([{ role: 'user', content: prompt }], 0));
+  const messages = [
+    { role: 'system', content: 'You are a strict but fair English teacher. Grade the whole exercise. All feedback strings MUST be in Simplified Chinese. Keep English only in question text, student answers, reference answers, and corrected English examples. Return JSON only, without Markdown. Structure: {"mcq":[{"index":0,"correct":true,"feedback":"..."}],"fill":[{"index":0,"correct":true,"feedback":"..."}],"translations":[{"index":0,"correct":true,"feedback":"..."}]}. Each array must cover every item.' },
+    { role: 'user', content: JSON.stringify(payload) }
+  ];
+  const parsed = extractJSON(await callAI(messages, 0));
   return {
     mcq: Array.isArray(parsed.mcq) ? parsed.mcq : [],
     fill: Array.isArray(parsed.fill) ? parsed.fill : [],
     translations: Array.isArray(parsed.translations) ? parsed.translations : []
   };
-}function lookupDictionary(raw) {
+}
+function lookupDictionary(raw) {
   const word = normalizeWord(raw);
   const candidates = [word, aliases[word], word.replace(/ies$/, 'y'), word.replace(/es$/, ''), word.replace(/s$/, ''), word.replace(/ed$/, ''), word.replace(/ing$/, '')].filter(Boolean);
   for (const key of candidates) {
