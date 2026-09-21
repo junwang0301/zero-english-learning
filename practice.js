@@ -4,9 +4,11 @@ state.practice.cache = state.practice.cache || {};
 state.practice.tab = state.practice.tab || 'grammar';
 state.wrongBook = Array.isArray(state.wrongBook) ? state.wrongBook : readJSON(STORAGE.wrongBook, []);
 state.writing = state.writing && typeof state.writing === 'object' ? state.writing : readJSON(STORAGE.writing, { draft: null, history: [] });
+state.memory = state.memory && typeof state.memory === 'object' ? state.memory : readJSON(STORAGE.memory, { entries: [] });
+state.memory.entries = Array.isArray(state.memory.entries) ? state.memory.entries : [];
 const practiceThemes = { campus: '校园学习', life: '日常生活', technology: '科技网络', society: '社会热点', people: '人物故事', opinion: '观点表达' };
 const writingLevelRules = { A1: '3–5 个简单句，约 30–50 词', A2: '5–8 句，约 50–80 词', B1: '一段完整短文，约 80–120 词', CET4: '一篇完整作文，约 120–180 词' };
-function savePracticeData() { writeJSON(STORAGE.practice, state.practice); writeJSON(STORAGE.wrongBook, state.wrongBook); writeJSON(STORAGE.writing, state.writing); }
+function savePracticeData() { writeJSON(STORAGE.practice, state.practice); writeJSON(STORAGE.wrongBook, state.wrongBook); writeJSON(STORAGE.writing, state.writing); writeJSON(STORAGE.memory, state.memory); }
 function practiceTopic(id) { return (typeof grammarTopics !== 'undefined' ? grammarTopics : []).find(item => item.id === id) || findCourse(id); }
 function practiceNormalize(value) { return normalizeAnswer(value); }
 function practiceQuestionsFromTopic(topic) {
@@ -34,7 +36,7 @@ function practiceQuestionHtml(question, index, session) {
 function practiceSessionHtml(session) {
   const total = session.questions.length;
   const correct = session.results ? session.results.filter(item => item.correct).length : 0;
-  return `<div class="practice-session-head"><div><span class="eyebrow">${session.source === 'AI' ? 'AI 专项练习' : '离线基础练习'}</span><h2>${escapeHtml(session.topicTitle)}</h2><p>${escapeHtml(session.level)} · 共 ${total} 题</p></div><button class="secondary-button" type="button" data-practice-action="close-session">返回</button></div><div class="practice-question-list">${session.questions.map((question, index) => practiceQuestionHtml(question, index, session)).join('')}</div>${session.submitted ? `<div class="practice-result show"><span class="eyebrow">本次结果</span><strong>${session.score}%</strong><p>${correct}/${total} 题正确。错题已自动加入错题本。</p></div>` : ''}<div class="form-actions"><button class="primary-button" type="button" data-practice-action="${session.submitted ? 'close-session' : 'submit-grammar'}">${session.submitted ? '完成本次练习' : (isAIConfigured() ? '提交并交给 AI 批改' : '提交离线判定')}</button>${session.submitted ? '<button class="secondary-button" type="button" data-practice-action="new-grammar">再来一组</button>' : ''}</div>`;
+  return `<div class="practice-session-head"><div><span class="eyebrow">${session.source === 'AI' ? 'AI 专项练习' : '离线基础练习'}</span><h2>${escapeHtml(session.topicTitle)}</h2><p>${escapeHtml(session.level)} · 共 ${total} 题</p></div><button class="secondary-button" type="button" data-practice-action="close-session">返回</button></div><div class="practice-question-list">${session.questions.map((question, index) => practiceQuestionHtml(question, index, session)).join('')}</div>${session.submitted ? `<div class="practice-result show"><span class="eyebrow">本次结果</span><strong>${session.score}%</strong><p>${correct}/${total} 题正确。错题已自动加入错题本。</p></div>` : ''}<div class="form-actions"><button class="primary-button" type="button" data-practice-action="${session.submitted ? 'close-session' : 'submit-grammar'}">${session.submitted ? '完成本次练习' : (isAIConfigured() ? '提交并交给 AI 批改' : '提交离线判定')}</button>${session.submitted ? '<button class="secondary-button" type="button" data-practice-action="refresh-grammar">换一组新题</button>' : ''}</div>`;
 }
 function renderGrammarPractice() {
   const session = state.practice.active;
@@ -55,10 +57,10 @@ function validPracticeQuestions(value) {
     return Boolean(question.id && question.prompt && (question.referenceAnswer || question.answer !== undefined));
   }) && counts.mcq === 2 && counts.fill === 2 && counts.correction === 2 && counts.translation === 2;
 }
-async function generateAIQuestions(topic, level) {
+async function generateAIQuestions(topic, level, nonce = 0) {
   const messages = [
     { role: 'system', content: '你是英语语法老师。只输出 JSON，不要 Markdown。必须返回 8 道题，题型数量严格为 mcq 2、fill 2、correction 2、translation 2。' },
-    { role: 'user', content: `专题：${topic.title}。等级：${level}。知识点：${topic.summary}。规则：${topic.rules.map(item => item[1]).join('；')}。JSON 结构必须为 {"questions":[{"id":"q1","type":"mcq|fill|correction|translation","prompt":"题目","options":["A","B","C"],"answer":0,"referenceAnswer":"参考答案","explanation":"解析"}]}。选择题必须有 options 和数字 answer。` }
+    { role: 'user', content: `专题：${topic.title}。等级：${level}。本轮标记：${nonce || '首次'}。知识点：${topic.summary}。规则：${topic.rules.map(item => item[1]).join('；')}。请生成与上一轮不同的题目。JSON 结构必须为 {"questions":[{"id":"q1","type":"mcq|fill|correction|translation","prompt":"题目","options":["A","B","C"],"answer":0,"referenceAnswer":"参考答案","explanation":"解析"}]}。选择题必须有 options 和数字 answer。` }
   ];
   const parsed = extractJSON(await callAI(messages, 0.45));
   if (!validPracticeQuestions(parsed)) throw new Error('AI 题目格式不符合要求');
@@ -70,22 +72,23 @@ function setGrammarSession(topic, level, questions, source) {
   state.practice.level = level;
   savePracticeData();
 }
-async function startGrammarPractice() {
+async function startGrammarPractice(forceNew = false) {
   const topicId = $('#practiceTopic') ? $('#practiceTopic').value : state.practice.topicId;
-  const level = $('#practiceLevel') ? $('#practiceLevel').value : state.settings.level;
+  const level = $('#practiceLevel') ? $('#practiceLevel').value : (state.practice.level || state.settings.level || 'A1');
   const topic = practiceTopic(topicId);
   if (!topic) return;
   if (isAIConfigured()) {
-    setLoading(true, 'AI 正在生成语法专项题…');
+    setLoading(true, forceNew ? 'AI 正在生成一组新题…' : 'AI 正在生成语法专项题…');
+    const key = `${topic.id}:${level}`;
+    const cached = state.practice.cache[key] || [];
     try {
-      const key = `${topic.id}:${level}`;
-      const cached = state.practice.cache[key] || [];
-      const questions = cached.length ? cached[0] : await generateAIQuestions(topic, level);
-      if (!cached.length) state.practice.cache[key] = [questions].concat(cached).slice(0, 3);
-      setGrammarSession(topic, level, questions, cached.length ? 'CACHE' : 'AI');
+      const questions = await generateAIQuestions(topic, level, forceNew ? Date.now() : 0);
+      state.practice.cache[key] = [questions].concat(forceNew ? cached : []).slice(0, 3);
+      setGrammarSession(topic, level, questions, 'AI');
     } catch (error) {
-      setGrammarSession(topic, level, practiceQuestionsFromTopic(topic), 'LOCAL');
-      showToast('AI 生成失败，已切换到离线基础题');
+      if (cached.length) setGrammarSession(topic, level, cached[0], 'CACHE');
+      else setGrammarSession(topic, level, practiceQuestionsFromTopic(topic), 'LOCAL');
+      showToast(forceNew ? 'AI 换题失败，已使用离线回退' : 'AI 生成失败，已使用缓存或离线基础题');
     } finally { setLoading(false); }
   } else {
     setGrammarSession(topic, level, practiceQuestionsFromTopic(topic), 'LOCAL');
@@ -116,9 +119,15 @@ async function gradeGrammarSession(session) {
   ];
   const parsed = extractJSON(await callAI(messages, 0.2));
   if (!parsed || !Array.isArray(parsed.results)) throw new Error('AI 批改格式错误');
+  const localResults = localGrammarResults(session);
   return session.questions.map(question => {
-    const item = parsed.results.find(result => result.id === question.id) || {};
-    return { id: question.id, correct: item.correct === true || String(item.correct).toLowerCase() === 'true', feedback: String(item.feedback || (item.correct ? '回答正确。' : `参考答案：${question.referenceAnswer || ''}`)) };
+    const item = parsed.results.find(result => result.id === question.id);
+    const local = localResults.find(result => result.id === question.id) || { correct: false };
+    const rawCorrect = item && item.correct;
+    const hasValidAIResult = Boolean(item && (typeof rawCorrect === 'boolean' || ['true', 'false'].includes(String(rawCorrect).toLowerCase())));
+    const aiCorrect = hasValidAIResult && (rawCorrect === true || String(rawCorrect).toLowerCase() === 'true');
+    const fallbackFeedback = local.correct ? '\u56de\u7b54\u6b63\u786e\u3002' : '\u53c2\u8003\u7b54\u6848\uff1a' + (question.referenceAnswer || '');
+    return { id: question.id, correct: question.type === 'mcq' ? local.correct : (hasValidAIResult ? aiCorrect : local.correct), feedback: String((item && item.feedback) || local.feedback || fallbackFeedback) };
   });
 }
 function rememberWrongQuestion(session, question, result) {
@@ -149,8 +158,42 @@ async function submitGrammarPractice() {
   session.score = Math.round(results.filter(item => item.correct).length / results.length * 100);
   session.submitted = true;
   session.questions.forEach((question, index) => rememberWrongQuestion(session, question, results[index]));
+  const wrongMemory = session.source === 'WRONG' && results[0] && results[0].correct ? state.wrongBook.find(item => item.id === session.questions[0].id) : null;
   savePracticeData();
   renderPractice();
+  if (wrongMemory) setTimeout(() => promptWrongMemory(wrongMemory), 0);
+}
+function memoryEntryExists(sourceId, type) {
+  return (state.memory.entries || []).some(item => item.sourceId === sourceId && item.type === type);
+}
+function addMemoryEntry(data) {
+  const entry = Object.assign({ id: uid(), createdAt: Date.now() }, data);
+  state.memory.entries = [entry].concat(state.memory.entries || []);
+  savePracticeData();
+  return entry;
+}
+function closeMemoryPrompt() { const modal = $('#memoryPrompt'); if (modal) modal.remove(); }
+function openMemoryPrompt(payload) {
+  closeMemoryPrompt();
+  const modal = document.createElement('div'); modal.id = 'memoryPrompt'; modal.className = 'modal-backdrop';
+  modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
+  modal.innerHTML = `<section class="memory-prompt-card"><span class="eyebrow">记忆本</span><h2>是否加入记忆本？</h2><p>${escapeHtml(payload.preview || '')}</p><div class="form-actions"><button class="primary-button" type="button" data-memory-action="add" data-memory-id="${payload.sourceId}" data-memory-type="${payload.type}">加入记忆本</button><button class="secondary-button" type="button" data-memory-action="skip">暂不加入</button><button class="text-button" type="button" data-memory-action="suppress" data-memory-id="${payload.sourceId}" data-memory-type="${payload.type}">不再提示</button></div></section>`;
+  document.body.appendChild(modal);
+  modal._memoryPayload = payload;
+}
+function promptWrongMemory(item) {
+  if (!item || item.promptSuppressed || memoryEntryExists(item.id, 'wrong-correction')) return;
+  openMemoryPrompt({ sourceId: item.id, type: 'wrong-correction', preview: item.prompt + ' → ' + (item.referenceAnswer || ''), entry: { sourceId: item.id, type: 'wrong-correction', topicId: item.topicId, topicTitle: item.topicTitle, level: item.level, title: item.topicTitle, content: item.prompt, reference: item.referenceAnswer || '', explanation: item.explanation || '' } });
+}
+function promptWritingMemory(record) {
+  if (!record || record.promptSuppressed || memoryEntryExists(record.id, 'writing')) return;
+  openMemoryPrompt({ sourceId: record.id, type: 'writing', preview: record.promptTitle + '：' + String(record.answer || '').slice(0, 100), entry: { sourceId: record.id, type: 'writing', level: record.level, title: record.promptTitle, content: record.answer, reference: (record.feedback && record.feedback.modelEssay) || '', explanation: (record.feedback && record.feedback.feedback) || '' } });
+}
+function renderMemoryBook() {
+  const query = (state.practice.memoryQuery || '').trim().toLowerCase();
+  const type = state.practice.memoryType || 'all';
+  const entries = (state.memory.entries || []).filter(item => (type === 'all' || item.type === type) && (!query || [item.title, item.content, item.reference, item.topicTitle].join(' ').toLowerCase().includes(query)));
+  return `<div class="practice-panel"><div class="practice-panel-intro"><span class="eyebrow">MEMORY BOOK</span><h2>记忆本</h2><p>保存写作成果和订正成功的错题，方便以后回顾和复习。</p></div><div class="memory-tools"><input id="memorySearch" type="search" value="${escapeHtml(state.practice.memoryQuery || '')}" placeholder="搜索记忆内容" aria-label="搜索记忆本"><select id="memoryType" aria-label="记忆类型"><option value="all" ${type === 'all' ? 'selected' : ''}>全部类型</option><option value="writing" ${type === 'writing' ? 'selected' : ''}>写作练习</option><option value="wrong-correction" ${type === 'wrong-correction' ? 'selected' : ''}>错题订正</option></select></div>${entries.length ? `<div class="memory-list">${entries.map(item => `<article class="memory-item"><div class="wrong-book-top"><span>${item.type === 'writing' ? '写作练习' : '错题订正'} · ${escapeHtml(item.level || '')}</span><small>${new Date(item.createdAt).toLocaleDateString('zh-CN')}</small></div><h3>${escapeHtml(item.title || '')}</h3><p>${escapeHtml(item.content || '')}</p>${item.reference ? `<small>参考：${escapeHtml(item.reference)}</small>` : ''}<button class="text-button" type="button" data-practice-action="delete-memory" data-memory-id="${item.id}">删除</button></article>`).join('')}</div>` : '<div class="empty-state"><h2>还没有记忆内容</h2><p>在错题订正答对或完成写作后，可以选择加入记忆本。</p></div>'}</div>`;
 }
 function renderWrongBook() {
   const entries = state.wrongBook.filter(item => !item.mastered);
@@ -214,6 +257,7 @@ async function submitWritingPractice() {
   state.writing.draft = null;
   state.writing.lastRecord = record;
   savePracticeData(); renderPractice();
+  setTimeout(() => promptWritingMemory(record), 0);
 }
 function renderWritingFeedback(record) {
   if (!record) return '';
@@ -228,11 +272,20 @@ function renderPractice() {
   if (!summary || !content) return;
   const tab = state.practice.tab || 'grammar';
   const wrongCount = (state.wrongBook || []).filter(item => !item.mastered).length;
-  summary.innerHTML = `<strong>${typeof grammarTopics !== 'undefined' ? grammarTopics.length : 0}</strong><span>语法微专题</span><strong>${wrongCount}</strong><span>待掌握错题</span>`;
+  const memoryCount = (state.memory.entries || []).length;
+  summary.innerHTML = `<strong>${typeof grammarTopics !== 'undefined' ? grammarTopics.length : 0}</strong><span>语法微专题</span><strong>${wrongCount}</strong><span>待掌握错题</span><strong>${memoryCount}</strong><span>记忆本</span>`;
   $$('.practice-tab').forEach(button => button.classList.toggle('active', button.dataset.practiceTab === tab));
-  content.innerHTML = tab === 'wrong' ? renderWrongBook() : (tab === 'writing' ? renderWritingPanel() : renderGrammarPractice());
+  content.innerHTML = tab === 'wrong' ? renderWrongBook() : (tab === 'writing' ? renderWritingPanel() : (tab === 'memory' ? renderMemoryBook() : renderGrammarPractice()));
+  if (typeof window.wordifyContent === 'function') window.wordifyContent(content);
 }
 document.addEventListener('click', event => {
+  const memoryButton = event.target.closest('[data-memory-action]');
+  if (memoryButton) {
+    const modal = $('#memoryPrompt'); const payload = modal && modal._memoryPayload; const action = memoryButton.dataset.memoryAction;
+    if (action === 'add' && payload) { addMemoryEntry(payload.entry); showToast('已加入记忆本'); }
+    if (action === 'suppress' && payload) { if (payload.type === 'writing') { const record = (state.writing.history || []).find(item => item.id === payload.sourceId); if (record) record.promptSuppressed = true; } else { const item = (state.wrongBook || []).find(entry => entry.id === payload.sourceId); if (item) item.promptSuppressed = true; } savePracticeData(); }
+    closeMemoryPrompt(); renderPractice(); return;
+  }
   const nav = event.target.closest('[data-view="practice"]');
   if (nav) setTimeout(renderPractice, 0);
   const tab = event.target.closest('[data-practice-tab]');
@@ -243,6 +296,7 @@ document.addEventListener('click', event => {
   if (name === 'start-grammar') startGrammarPractice();
   else if (name === 'submit-grammar') submitGrammarPractice();
   else if (name === 'close-session' || name === 'new-grammar') { state.practice.active = null; savePracticeData(); renderPractice(); }
+  else if (name === 'refresh-grammar') startGrammarPractice(true);
   else if (name === 'redo-wrong') redoWrong(action.dataset.wrongId);
   else if (name === 'master-wrong') markWrongMastered(action.dataset.wrongId);
   else if (name === 'delete-wrong') deleteWrong(action.dataset.wrongId);
@@ -250,9 +304,11 @@ document.addEventListener('click', event => {
   else if (name === 'submit-writing') submitWritingPractice();
   else if (name === 'clear-writing-draft') { if (state.writing.draft) { state.writing.draft.answer = ''; savePracticeData(); renderPractice(); } }
   else if (name === 'delete-writing') { state.writing.history = (state.writing.history || []).filter(item => item.id !== action.dataset.writingId); savePracticeData(); renderPractice(); }
+  else if (name === 'delete-memory') { state.memory.entries = (state.memory.entries || []).filter(item => item.id !== action.dataset.memoryId); savePracticeData(); renderPractice(); }
 });
-document.addEventListener('input', event => { if (event.target && event.target.id === 'writingDraft') saveWritingDraft(); });
+document.addEventListener('input', event => { if (event.target && event.target.id === 'writingDraft') saveWritingDraft(); if (event.target && event.target.id === 'memorySearch') { state.practice.memoryQuery = event.target.value; renderPractice(); } });
 document.addEventListener('change', event => {
+  if (event.target && event.target.id === 'memoryType') { state.practice.memoryType = event.target.value; renderPractice(); return; }
   if (event.target && ['data-level', 'mobileLevelSelect', 'articleLevel'].some(key => event.target.matches && event.target.matches(`[${key}]`))) setTimeout(renderPractice, 0);
 });
 renderPractice();

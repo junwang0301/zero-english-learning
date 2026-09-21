@@ -351,6 +351,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .video-frame { position: relative; width: 100%; margin-top: 16px; border-radius: 14px; overflow: hidden; background: #101914; aspect-ratio: 16 / 9; }
 .video-frame iframe { width: 100%; height: 100%; border: 0; }
 .video-frame.compact { margin: 12px 0; }
+.video-quality { display: inline-flex; align-items: center; margin-top: 6px; padding: 3px 7px; border-radius: 999px; background: #eef5ea; color: #3e704f; font-size: 10px; font-weight: 700; }
+.video-quality.partial { background: #fff4d9; color: #8a5a10; }
 .video-note { margin: 11px 0 4px; color: var(--muted); font-size: 12px; }
 .study-panel { margin-bottom: 18px; padding: 26px; border-radius: 22px; background: #15251e; color: #fff; }
 .study-panel .text-button { color: var(--lime); }
@@ -637,3 +639,20 @@ html[data-theme="dark"] .app-tools button { background:#1d2b24; color:#eef5ef; }
   .speech-settings { grid-template-columns: 1fr; }
   body, button, input, select, textarea { overflow-wrap: anywhere; }
 }
+/* Memory book and global words */
+.memory-tools { display: grid; grid-template-columns: minmax(200px, 1fr) 190px; gap: 10px; margin: 18px 0 14px; }
+.memory-tools input, .memory-tools select { min-height: 42px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink); }
+.memory-list { display: grid; gap: 12px; }
+.memory-item { padding: 16px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
+.memory-item h3 { margin: 10px 0 6px; }
+.memory-item p { margin: 0 0 7px; color: #4b5a51; line-height: 1.65; }
+.memory-item small { display: block; color: var(--muted); line-height: 1.6; }
+.memory-item .text-button { margin-top: 10px; }
+.memory-prompt-card { width: min(520px, 100%); padding: 26px; border-radius: 20px; background: #fffdf9; box-shadow: 0 24px 70px rgba(17,29,23,.28); }
+.memory-prompt-card h2 { margin: 8px 0; }
+.memory-prompt-card p { color: #4d5d54; line-height: 1.7; }
+.global-word { border: 0; padding: 1px 2px; background: transparent; font: inherit; line-height: inherit; color: inherit; cursor: pointer; }
+.global-word:hover, .global-word:focus-visible { background: #eef4ef; border-radius: 4px; }
+html[data-theme="dark"] .memory-item { background: #17231d; }
+html[data-theme="dark"] .memory-prompt-card { background: #17231d; color: var(--ink); }
+@media (max-width: 620px) { .memory-tools { grid-template-columns: 1fr; } }

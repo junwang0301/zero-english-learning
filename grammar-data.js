@@ -125,7 +125,7 @@ function grammarTopicFromRow(line, index) {
     ],
     translations: [{ zh: '请用本专题语法写一个正确句子：' + title, answer: correct, explanation: summary }],
     microTopic: true,
-    video: Object.assign({}, videoSource, { note: `来源：${videoSource.title || 'B站语法合集'}。当前专题重点：${title}。${videoSource.note || '请结合知识卡定位对应片段。'}`, topicTitle: title, coverage: '合集复用，需按专题重点定位' })
+    video: Object.assign({}, videoSource, { matchQuality: videoSource.matchQuality || 'partial', note: `来源：${videoSource.title || 'B站语法合集'}。当前专题重点：${title}。${videoSource.note || '请结合知识卡定位对应片段。'}`, topicTitle: title, coverage: '合集复用，需按专题重点定位' })
   };
 }
 const grammarTopics = grammarTopicRows.trim().split(/\r?\n/).filter(Boolean).map(grammarTopicFromRow);

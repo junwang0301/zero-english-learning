@@ -56,6 +56,41 @@
     const lookup = $('#drawerLookupButton'); if (lookup) lookup.disabled = !configured;
   }
   function createHtml(html) { const wrap = document.createElement('div'); wrap.innerHTML = html; return wrap.firstElementChild; }
+
+  function wordifyNode(node, context) {
+    if (!node) return;
+    if (node.nodeType === 3) {
+      const text = node.nodeValue || '';
+      if (!/[A-Za-z]/.test(text)) return;
+      const parent = node.parentElement;
+      if (parent && parent.closest('button, select, option, input, textarea, code, pre, .word-token, .article-body')) return;
+      const parts = text.split(/([A-Za-z]+(?:'[A-Za-z]+)?)/g).filter(Boolean);
+      const fragment = document.createDocumentFragment();
+      parts.forEach(part => {
+        if (/^[A-Za-z]+(?:'[A-Za-z]+)?$/.test(part)) {
+          const button = document.createElement('button');
+          button.type = 'button'; button.className = 'word-token global-word'; button.textContent = part;
+          button.dataset.globalWord = part; button.dataset.globalContext = context;
+          fragment.appendChild(button);
+        } else fragment.appendChild(document.createTextNode(part));
+      });
+      node.parentNode.replaceChild(fragment, node);
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    if (node.matches('button, select, option, input, textarea, code, pre, .word-token, .article-body')) return;
+    Array.from(node.childNodes).forEach(child => wordifyNode(child, context));
+  }
+  function wordify(root) {
+    if (!root) return;
+    const selectors = ['#lessonDetail .formula-block','#lessonDetail .rule-list li','#lessonDetail .example-row .en','#lessonDetail .example-row .zh','#lessonDetail .mistake-list li','#practiceContent .writing-task-card','#practiceContent .writing-feedback','#practiceContent .practice-analysis','#practiceContent .practice-question .question-text','#practiceContent .phrase-list','#view-settings .faq-card','#view-settings .form-note'];
+    selectors.forEach(selector => root.querySelectorAll(selector).forEach(element => {
+      if (element.dataset.wordified === '1') return;
+      const context = (element.textContent || '').trim().slice(0, 260);
+      wordifyNode(element, context); element.dataset.wordified = '1';
+    }));
+  }
+  window.wordifyContent = function (root) { wordify(root); };
   function ensureSpeechPanel(container) {
     if (!container || container.querySelector('.speech-settings')) return;
     const panel = document.createElement('div'); panel.className = 'speech-settings';
@@ -70,7 +105,7 @@
   const originalUpdateAIStatus = updateAIStatus;
   updateAIStatus = function () { originalUpdateAIStatus(); updateAIUI(); };
   const originalRenderArticle = renderArticle;
-  renderArticle = function (article) { originalRenderArticle(article); updateAIUI(); };
+  renderArticle = function (article) { originalRenderArticle(article); updateAIUI(); wordify($('#articlePaper')); };
   function buildLessonAnalysis(lesson, session) {
     let html = '';
     lesson.mcq.forEach((q, i) => { html += '<div class="practice-analysis-item"><strong>选择 ' + (i + 1) + '</strong><p>你的答案：' + escapeHtml(session.answers.mcq[i] == null ? '未作答' : q.options[session.answers.mcq[i]]) + '</p><p>正确答案：' + escapeHtml(q.options[q.answer]) + '</p><p>' + escapeHtml(q.explanation || '') + '</p></div>'; });
@@ -80,18 +115,19 @@
   }
   const originalRenderLessonDetail = renderLessonDetail;
   renderLessonDetail = function (lesson) {
-    originalRenderLessonDetail(lesson); updateAIUI();
+    originalRenderLessonDetail(lesson); updateAIUI(); wordify($('#lessonDetail'));
     const session = state.lessonSession;
     if (session && session.submitted) {
       const detail = $('#lessonDetail');
       const analysis = document.createElement('details'); analysis.className = 'practice-analysis';
       analysis.innerHTML = '<summary>查看整套练习解析</summary>' + buildLessonAnalysis(lesson, session);
       detail.appendChild(analysis);
+      wordify(detail);
     }
   };
   const originalRenderPractice = renderPractice;
   renderPractice = function () {
-    originalRenderPractice(); updateAIUI();
+    originalRenderPractice(); updateAIUI(); wordify($('#practiceContent'));
     const session = state.practice && state.practice.active;
     if (!session || !session.submitted) return;
     const content = $('#practiceContent'); if (!content || content.querySelector('.practice-analysis')) return;
@@ -149,6 +185,8 @@
     $$('#lessonGrid .grammar-group').forEach(group => { group.classList.toggle('hidden', !group.querySelector('.lesson-card:not(.hidden)')); });
   }
   document.addEventListener('click', event => {
+    const globalWord = event.target.closest('[data-global-word]');
+    if (globalWord) { event.preventDefault(); openWordDrawer(globalWord.dataset.globalWord, 0, { en: globalWord.dataset.globalContext || globalWord.dataset.globalWord, zh: '' }); return; }
     const button = event.target.closest('[data-ui-action]');
     if (!button) return;
     const action = button.dataset.uiAction;
@@ -178,6 +216,6 @@
   window.addEventListener('offline', () => showToast('网络已断开，AI 功能暂不可用，离线课程仍可继续'));
   window.addEventListener('online', () => showToast('网络已恢复'));
   if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (preferredTheme() === 'system') applyTheme(); });
-  injectTools(); injectStorageNotice(); injectSettingsExtras(); injectOnboarding(); applyTheme(); applyFontScale();
+  injectTools(); injectStorageNotice(); injectSettingsExtras(); injectOnboarding(); applyTheme(); applyFontScale(); wordify($('#view-settings'));
   renderHome(); renderGrammar(); updateAIUI();
 })();

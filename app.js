@@ -8,7 +8,8 @@ const STORAGE = {
   wordData: 'english-learning:v1:word-data',
   practice: 'english-learning:v1:practice',
   wrongBook: 'english-learning:v1:wrong-book',
-  writing: 'english-learning:v1:writing'
+  writing: 'english-learning:v1:writing',
+  memory: 'english-learning:v1:memory'
 };
 const DAY = 24 * 60 * 60 * 1000;
 const REVIEW_INTERVALS = [0, 1, 3, 7, 14, 30];
@@ -502,7 +503,8 @@ const state = {
   metadataEnrichment: null,
   practice: null,
   wrongBook: null,
-  writing: null
+  writing: null,
+  memory: null
 };
 
 const LEVEL_ORDER = ['A1', 'A2', 'B1', 'CET4'];
@@ -726,11 +728,17 @@ function renderLessonPractice(lesson) {
   if (course && course.video) return course.video;
   return typeof lessonVideos !== 'undefined' ? lessonVideos[courseId] : null;
 }
+function videoQualityHtml(video) {
+  if (!video || !video.matchQuality) return '';
+  const exact = video.matchQuality === 'exact';
+  const label = exact ? '\u7cbe\u51c6\u5339\u914d' : '\u76f8\u5173\u8bb2\u89e3 \u00b7 \u5408\u96c6\u590d\u7528';
+  return `<span class="video-quality ${exact ? 'exact' : 'partial'}">${label}</span>`;
+}
 function renderLessonVideoHtml(courseId) {
   const video = videoForCourse(courseId);
   if (!video) return '';
   const player = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(video.bvid)}&page=${video.page || 1}&high_quality=1&danmaku=0`;
-  return `<article class="content-card video-lesson-card"><div class="video-heading"><div><span class="eyebrow">视频授课</span><h2>${escapeHtml(video.title)}</h2></div><span class="video-teacher">${escapeHtml(video.teacher)}</span></div><button class="video-launch" type="button" data-action="play-video" data-video-src="${player}" data-video-title="${escapeHtml(video.title)}"><span>▶</span><strong>点击播放视频课程</strong><small>加载 B 站官方播放器 · 倍速请在 B 站播放器内设置（最高 2 倍速）</small></button><p class="video-note">${escapeHtml(video.note || '配套语法讲解')}</p><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站打开原视频 →</a></article>`;
+  return `<article class="content-card video-lesson-card"><div class="video-heading"><div><span class="eyebrow">视频授课</span><h2>${escapeHtml(video.title)}</h2>${videoQualityHtml(video)}</div><span class="video-teacher">${escapeHtml(video.teacher)}</span></div><button class="video-launch" type="button" data-action="play-video" data-video-src="${player}" data-video-title="${escapeHtml(video.title)}"><span>▶</span><strong>点击播放视频课程</strong><small>加载 B 站官方播放器 · 倍速请在 B 站播放器内设置（最高 2 倍速）</small></button><p class="video-note">${escapeHtml(video.note || '配套语法讲解')}</p><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站打开原视频 →</a></article>`;
 }
 function updateReadingVideo() {
   const panel = $('#lessonVideoPanel');
@@ -740,7 +748,7 @@ function updateReadingVideo() {
   if (!video) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
   const player = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(video.bvid)}&page=${video.page || 1}&high_quality=1&danmaku=0`;
   panel.classList.remove('hidden');
-  panel.innerHTML = `<span class="eyebrow">视频授课</span><h3>${escapeHtml(video.title)}</h3><p>${escapeHtml(video.note || '')}</p><small>来源：${escapeHtml(video.teacher)}</small><button class="video-launch compact" type="button" data-action="play-video" data-video-src="${player}" data-video-title="${escapeHtml(video.title)}"><span>▶</span><strong>点击播放视频课程</strong><small>加载 B 站官方播放器 · 倍速请在 B 站播放器内设置（最高 2 倍速）</small></button><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站观看 →</a>`;
+  panel.innerHTML = `<span class="eyebrow">视频授课</span><h3>${escapeHtml(video.title)}</h3>${videoQualityHtml(video)}<p>${escapeHtml(video.note || '')}</p><small>来源：${escapeHtml(video.teacher)}</small><button class="video-launch compact" type="button" data-action="play-video" data-video-src="${player}" data-video-title="${escapeHtml(video.title)}"><span>▶</span><strong>点击播放视频课程</strong><small>加载 B 站官方播放器 · 倍速请在 B 站播放器内设置（最高 2 倍速）</small></button><a class="text-button" href="${video.source}" target="_blank" rel="noopener noreferrer">在 B 站观看 →</a>`;
 }
 function renderLessonDetail(lesson) {
   const done = state.progress.completed[lesson.id] && state.progress.completed[lesson.id].completed;
@@ -1715,12 +1723,11 @@ function wordInfoFor(raw, sentence) {
   const cached = wordDataCache()[key] || {};
   return { word: key, phonetic: (articleItem && articleItem.phonetic) || (saved && saved.phonetic) || cached.phonetic || local.phonetic || '', meaningZh: (articleItem && articleItem.meaningZh) || (saved && saved.meaningZh) || cached.meaningZh || local.meaningZh || '', mnemonic: (saved && saved.mnemonic) || cached.mnemonic || mnemonicFor(key, (saved && saved.meaningZh) || local.meaningZh || ''), contextZh: sentence.zh || (articleItem && articleItem.contextZh) || '', example: (articleItem && articleItem.example) || sentence.en || '' };
 }
-function openWordDrawer(raw, sentenceIndex) {
-  if (!state.currentArticle) return;
-  const sentence = state.currentArticle.sentences[sentenceIndex] || { en: raw, zh: '' };
+function openWordDrawer(raw, sentenceIndex, contextOverride = null) {
+  const sentence = contextOverride || (state.currentArticle && state.currentArticle.sentences[sentenceIndex]) || { en: raw, zh: '' };
   const info = wordInfoFor(raw, sentence);
-  state.selectedWord = Object.assign(info, { sentenceIndex, raw });
-  $('#drawerGrammar').textContent = state.currentArticle.grammarFocus || '生词卡';
+  state.selectedWord = Object.assign(info, { sentenceIndex, raw, contextOverride });
+  $('#drawerGrammar').textContent = state.currentArticle ? (state.currentArticle.grammarFocus || '生词卡') : '生词卡';
   $('#drawerWord').textContent = raw;
   $('#drawerPhonetic').textContent = info.phonetic || '';
   $('#drawerMeaning').textContent = info.meaningZh || '尚未加载释义，可使用 AI 查询';
@@ -1739,9 +1746,10 @@ function openWordDrawer(raw, sentenceIndex) {
     $('#drawerMnemonic').textContent = state.selectedWord.mnemonic || '';
     renderVocabulary();
   });
-  const isMarked = Boolean(state.currentArticle.markedWords && state.currentArticle.markedWords[info.word]);
+  const isMarked = Boolean(state.currentArticle && state.currentArticle.markedWords && state.currentArticle.markedWords[info.word]);
   const isSaved = Boolean(state.vocabulary[info.word]);
   $('#drawerMarkButton').textContent = isMarked ? '取消标注' : '标注生词';
+  $('#drawerMarkButton').classList.toggle('hidden', !state.currentArticle);
   $('#drawerSaveButton').textContent = isSaved ? '移出单词本' : '加入单词本';
   $('#drawerLookupButton').classList.toggle('hidden', Boolean(info.meaningZh));
   $('#wordDrawer').classList.remove('hidden');
@@ -1764,7 +1772,7 @@ function persistCurrentArticle() {
   renderArticleHistory();
 }
 function toggleSelectedMark() {
-  if (!state.selectedWord || !state.currentArticle) return;
+  if (!state.selectedWord || !state.currentArticle) { showToast('只有文章内的单词支持标注'); return; }
   const key = state.selectedWord.word;
   state.currentArticle.markedWords[key] = !state.currentArticle.markedWords[key];
   persistCurrentArticle();
@@ -1772,19 +1780,18 @@ function toggleSelectedMark() {
   openWordDrawer(state.selectedWord.raw, state.selectedWord.sentenceIndex);
 }
 function toggleSelectedSave() {
-  if (!state.selectedWord || !state.currentArticle) return;
+  if (!state.selectedWord) return;
   const key = state.selectedWord.word;
   if (state.vocabulary[key]) { delete state.vocabulary[key]; showToast('已从单词本移出'); }
   else {
-    const sentence = state.currentArticle.sentences[state.selectedWord.sentenceIndex] || {};
+    const sentence = state.selectedWord.contextOverride || (state.currentArticle && state.currentArticle.sentences[state.selectedWord.sentenceIndex]) || { en: state.selectedWord.raw, zh: '' };
     state.vocabulary[key] = { word: key, displayWord: state.selectedWord.raw, phonetic: state.selectedWord.phonetic || '', meaningZh: state.selectedWord.meaningZh || '', mnemonic: state.selectedWord.mnemonic || mnemonicFor(key, state.selectedWord.meaningZh || ''), contextZh: state.selectedWord.contextZh || '', example: state.selectedWord.example || sentence.en || '', context: sentence.en || '', addedAt: Date.now(), level: 0, correct: 0, wrong: 0, nextReview: Date.now() };
-    state.currentArticle.markedWords[key] = true;
+    if (state.currentArticle) state.currentArticle.markedWords[key] = true;
     showToast('已加入单词本，将进入间隔复习');
   }
   writeJSON(STORAGE.vocabulary, state.vocabulary);
-  persistCurrentArticle();
-  renderArticle(state.currentArticle);
-  openWordDrawer(state.selectedWord.raw, state.selectedWord.sentenceIndex);
+  if (state.currentArticle) { persistCurrentArticle(); renderArticle(state.currentArticle); }
+  openWordDrawer(state.selectedWord.raw, state.selectedWord.sentenceIndex, state.selectedWord.contextOverride);
   renderVocabulary();
   updateStats();
   renderHome();
@@ -1796,13 +1803,15 @@ async function lookupWordWithAI() {
   const selected = state.selectedWord;
   setLoading(true, 'AI 正在查询上下文释义…');
   try {
-    const prompt = `请为英语学习者解释下面单词在句子中的含义。只返回 JSON：{"meaningZh":"中文释义","phonetic":"音标可留空","example":"一个简单英文例句"}。\n单词：${selected.raw}\n句子：${state.currentArticle.sentences[selected.sentenceIndex].en}`;
+    const prompt = `请为英语学习者解释下面单词在句子中的含义。只返回 JSON：{"meaningZh":"中文释义","phonetic":"音标可留空","example":"一个简单英文例句"}。\n单词：${selected.raw}\n句子：${selected.contextOverride ? selected.contextOverride.en : state.currentArticle.sentences[selected.sentenceIndex].en}`;
     const parsed = extractJSON(await callAI([{ role: 'user', content: prompt }], 0.2));
-    const itemIndex = state.currentArticle.vocabulary.findIndex(item => normalizeWord(item.word) === selected.word);
-    const item = { word: selected.word, phonetic: parsed.phonetic || '', meaningZh: parsed.meaningZh || '', contextZh: selected.contextZh, example: parsed.example || selected.example };
-    if (itemIndex >= 0) state.currentArticle.vocabulary[itemIndex] = item;
-    else state.currentArticle.vocabulary.push(item);
-    persistCurrentArticle();
+    if (state.currentArticle) {
+      const itemIndex = state.currentArticle.vocabulary.findIndex(item => normalizeWord(item.word) === selected.word);
+      const item = { word: selected.word, phonetic: parsed.phonetic || '', meaningZh: parsed.meaningZh || '', contextZh: selected.contextZh, example: parsed.example || selected.example };
+      if (itemIndex >= 0) state.currentArticle.vocabulary[itemIndex] = item;
+      else state.currentArticle.vocabulary.push(item);
+      persistCurrentArticle();
+    }
     renderArticle(state.currentArticle);
     openWordDrawer(selected.raw, selected.sentenceIndex);
   } catch (error) { showToast('AI 查询失败：' + error.message); }
@@ -2022,7 +2031,7 @@ function exportData() {
   if (includeApiKey && !confirm('备份将包含明文 API Key。不要把此文件分享给他人。是否继续导出？')) return;
   const settingsBackup = Object.assign({}, state.settings); delete settingsBackup.apiKey;
   if (includeApiKey) settingsBackup.apiKey = state.settings.apiKey;
-  const payload = { version: 4, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, practice: state.practice || {}, wrongBook: state.wrongBook || [], writing: state.writing || { draft: null, history: [] }, settings: settingsBackup };
+  const payload = { version: 4, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, practice: state.practice || {}, wrongBook: state.wrongBook || [], writing: state.writing || { draft: null, history: [] }, memory: state.memory || { entries: [] }, settings: settingsBackup };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -2048,6 +2057,7 @@ function importData(file) {
       state.practice = Object.assign({ tab: 'grammar', cache: {}, active: null, filter: 'all' }, payload.practice || {});
       state.wrongBook = Array.isArray(payload.wrongBook) ? payload.wrongBook : [];
       state.writing = payload.writing || { draft: null, history: [] };
+      state.memory = payload.memory || { entries: [] };
       if (payload.settings) state.settings = Object.assign({}, state.settings, payload.settings);
       writeJSON(STORAGE.progress, state.progress);
       writeJSON(STORAGE.vocabulary, state.vocabulary);
@@ -2055,6 +2065,7 @@ function importData(file) {
       writeJSON(STORAGE.practice, state.practice);
       writeJSON(STORAGE.wrongBook, state.wrongBook);
       writeJSON(STORAGE.writing, state.writing);
+      writeJSON(STORAGE.memory, state.memory);
       writeJSON(STORAGE.settings, state.settings);
       renderAll();
   renderLevelSwitchers();
@@ -2072,6 +2083,7 @@ function clearLearningData() {
   state.practice = { tab: 'grammar', cache: {}, active: null, filter: 'all' };
   state.wrongBook = [];
   state.writing = { draft: null, history: [] };
+  state.memory = { entries: [] };
   state.review = { queue: [], index: 0, revealed: false, dueOnly: true };
   writeJSON(STORAGE.progress, state.progress);
   writeJSON(STORAGE.vocabulary, state.vocabulary);
@@ -2079,6 +2091,7 @@ function clearLearningData() {
   writeJSON(STORAGE.practice, state.practice);
   writeJSON(STORAGE.wrongBook, state.wrongBook);
   writeJSON(STORAGE.writing, state.writing);
+  writeJSON(STORAGE.memory, state.memory);
   renderAll();
   showToast('学习数据已清空');
 }
