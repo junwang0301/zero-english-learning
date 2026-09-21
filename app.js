@@ -1280,6 +1280,20 @@ function openSavedArticle(id) {
   updateReadingVideo();
   showView('reading');
   $('#articlePaper').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (article.metadataPending && !article.partial && isAIConfigured() && !state.metadataEnrichment) {
+    const course = findCourse(article.grammarId);
+    if (course) {
+      enrichArticleWithRetry(article, course, null).then(updated => {
+        saveArticle(updated);
+        if (state.currentArticle && state.currentArticle.id === updated.id) renderArticle(updated);
+      }).catch(() => {
+        article.metadataPending = true;
+        state.metadataEnrichment = null;
+        saveArticle(article);
+        if (state.currentArticle && state.currentArticle.id === article.id) renderArticle(article);
+      });
+    }
+  }
 }
 function deleteSavedArticle(id) {
   state.articles = (state.articles || []).filter(article => article.id !== id);
@@ -1320,9 +1334,9 @@ function renderArticle(article) {
   const marked = article.markedWords || {};
   const enrichment = metadataEnrichmentFor(article);
   const metadataStatus = enrichment
-    ? `<span id="articleMetadataStatus" class="metadata-inline-status" aria-live="polite">${enrichment.retrying ? '首次补充失败，正在自动重试…' : '正在自动补充中文和语法…'}</span>`
+    ? `<span id="articleMetadataStatus" class="metadata-inline-status" aria-live="polite">${enrichment.retrying ? '\u9996\u6b21\u8865\u5145\u5931\u8d25\uff0c\u6b63\u5728\u81ea\u52a8\u91cd\u8bd5\u2026' : '\u6b63\u5728\u81ea\u52a8\u8865\u5145\u4e2d\u6587\u548c\u8bed\u6cd5\u2026'}</span>`
     : article.metadataPending && !article.partial && !state.articleGeneration
-      ? '<button class="secondary-button" type="button" data-action="enrich-article">重试补充翻译和语法</button>'
+      ? '<span id="articleMetadataStatus" class="metadata-inline-status">\u81ea\u52a8\u8865\u5145\u5931\u8d25\uff0c\u53ef\u70b9\u51fb\u201c\u5f3a\u5236\u91cd\u65b0\u83b7\u53d6\u4e2d\u6587\u548c\u8bed\u6cd5\u201d</span>'
       : '';
   const sourceLabel = article.partial ? 'AI 生成中' : (article.metadataPending ? 'AI 英文版' : (article.source === 'AI' ? 'AI 生成' : '本地文章'));
   const typeLabel = article.level === 'CET4' ? ({ wordBank: '选词填空 · 200–250词', careful: '仔细阅读 · 300–350词', long: '长篇阅读 · 900–1000词' })[article.articleType] || '' : '等级默认';
