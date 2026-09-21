@@ -108,26 +108,45 @@ function localGrammarResults(session) {
   return session.questions.map(question => {
     const answer = session.answers[question.id];
     const correct = question.type === 'mcq' ? Number(answer) === Number(question.answer) : practiceNormalize(answer) === practiceNormalize(question.referenceAnswer);
-    return { id: question.id, correct, feedback: correct ? '回答正确。' : `参考答案：${question.referenceAnswer || ''} ${question.explanation || ''}`.trim() };
+    const explanation = question.explanation ? ' ' + question.explanation : '';
+    const yes = '\u56de\u7b54\u6b63\u786e\u3002';
+    const ref = '\u53c2\u8003\u7b54\u6848\uff1a';
+    return { id: question.id, correct, feedback: correct ? (yes + explanation).trim() : (ref + (question.referenceAnswer || '') + explanation).trim() };
   });
 }
 async function gradeGrammarSession(session) {
-  const payload = session.questions.map(question => ({ id: question.id, type: question.type, prompt: question.prompt, referenceAnswer: question.referenceAnswer, studentAnswer: session.answers[question.id] || '' }));
+  const payload = session.questions.map(question => {
+    const rawAnswer = session.answers[question.id];
+    const optionIndex = Number(rawAnswer);
+    const selectedOption = question.type === 'mcq' && Array.isArray(question.options) && rawAnswer !== '' && Number.isInteger(optionIndex) ? question.options[optionIndex] : '';
+    return {
+      id: question.id,
+      type: question.type,
+      prompt: question.prompt,
+      options: Array.isArray(question.options) ? question.options : [],
+      referenceAnswer: question.referenceAnswer,
+      studentAnswer: question.type === 'mcq' ? (selectedOption || rawAnswer || '') : (rawAnswer || '')
+    };
+  });
   const messages = [
-    { role: 'system', content: '你是英语语法老师。只输出 JSON，不要 Markdown。逐题批改，合理答案应判对。结构为 {"score":0-100,"results":[{"id":"q1","correct":true,"feedback":"原因和修改建议"}]}。' },
+    { role: 'system', content: 'You are an English grammar teacher. Return JSON only, without Markdown. Grade each answer. For multiple-choice questions, use options and studentAnswer; studentAnswer is already resolved to the selected option text. Return exactly {"score":0-100,"results":[{"id":"q1","correct":true,"feedback":"reason and correction"}]}.' },
     { role: 'user', content: JSON.stringify(payload) }
   ];
   const parsed = extractJSON(await callAI(messages, 0.2));
-  if (!parsed || !Array.isArray(parsed.results)) throw new Error('AI 批改格式错误');
+  if (!parsed || !Array.isArray(parsed.results)) throw new Error('Invalid AI grading response');
   const localResults = localGrammarResults(session);
   return session.questions.map(question => {
     const item = parsed.results.find(result => result.id === question.id);
-    const local = localResults.find(result => result.id === question.id) || { correct: false };
+    const local = localResults.find(result => result.id === question.id) || { correct: false, feedback: '' };
     const rawCorrect = item && item.correct;
     const hasValidAIResult = Boolean(item && (typeof rawCorrect === 'boolean' || ['true', 'false'].includes(String(rawCorrect).toLowerCase())));
     const aiCorrect = hasValidAIResult && (rawCorrect === true || String(rawCorrect).toLowerCase() === 'true');
-    const fallbackFeedback = local.correct ? '\u56de\u7b54\u6b63\u786e\u3002' : '\u53c2\u8003\u7b54\u6848\uff1a' + (question.referenceAnswer || '');
-    return { id: question.id, correct: question.type === 'mcq' ? local.correct : (hasValidAIResult ? aiCorrect : local.correct), feedback: String((item && item.feedback) || local.feedback || fallbackFeedback) };
+    const aiFeedback = item && typeof item.feedback === 'string' ? item.feedback.trim() : '';
+    const negativeFeedback = /\u5224\u9519|\u9519\u8bef|\u4e0d\u6b63\u786e|\u7b54\u9519|wrong|incorrect/i.test(aiFeedback);
+    const positiveFeedback = /\u6b63\u786e|\u7b54\u5bf9|correct|right/i.test(aiFeedback) && !/\u4e0d|wrong|incorrect/i.test(aiFeedback);
+    const contradictsLocal = question.type === 'mcq' && aiFeedback && ((local.correct && negativeFeedback) || (!local.correct && positiveFeedback));
+    const feedback = question.type === 'mcq' ? (contradictsLocal || !aiFeedback ? local.feedback : aiFeedback) : (aiFeedback || local.feedback);
+    return { id: question.id, correct: question.type === 'mcq' ? local.correct : (hasValidAIResult ? aiCorrect : local.correct), feedback };
   });
 }
 function rememberWrongQuestion(session, question, result) {
