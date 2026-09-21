@@ -1325,6 +1325,26 @@ function articleViewState(article) {
   article.viewState.sentenceGrammar = article.viewState.sentenceGrammar || {};
   return article.viewState;
 }
+function articleFontScale(key) {
+  const value = Number(state.settings[key]);
+  return Math.max(0.8, Math.min(1.5, Number.isFinite(value) ? value : 1));
+}
+function articleFontControlsHtml(compact = false) {
+  const translation = articleFontScale('translationScale');
+  const grammar = articleFontScale('grammarScale');
+  const pct = value => Math.round(value * 100) + '%';
+  return `<div class="article-font-controls ${compact ? 'compact' : ''}" role="group" aria-label="???????"><label>???? <input class="article-font-range" data-font-scale="translation" type="range" min="0.8" max="1.5" step="0.05" value="${translation}" aria-label="????"><output data-font-scale-value="translation">${pct(translation)}</output></label><label>???? <input class="article-font-range" data-font-scale="grammar" type="range" min="0.8" max="1.5" step="0.05" value="${grammar}" aria-label="????"><output data-font-scale-value="grammar">${pct(grammar)}</output></label></div>`;
+}
+function applyArticleFontScales() {
+  const paper = $('#articlePaper');
+  if (!paper) return;
+  const translation = articleFontScale('translationScale');
+  const grammar = articleFontScale('grammarScale');
+  paper.style.setProperty('--translation-font-scale', String(translation));
+  paper.style.setProperty('--grammar-font-scale', String(grammar));
+  $$('[data-font-scale]').forEach(input => { const value = input.dataset.fontScale === 'translation' ? translation : grammar; input.value = String(value); });
+  $$('[data-font-scale-value]').forEach(output => { output.textContent = Math.round((output.dataset.fontScaleValue === 'translation' ? translation : grammar) * 100) + '%'; });
+}
 function renderArticle(article) {
   state.currentArticle = article;
   const course = findCourse(article.grammarId) || { cues: [] };
@@ -1364,8 +1384,8 @@ function renderArticle(article) {
   }).join(' ')}</p>`).join('');
   const totalWords = article.sentences.reduce((sum, sentence) => sum + (sentence.en.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g) || []).length, 0);
   $('#articleWordCount').textContent = `${totalWords} 个词`;
-  $('#articlePaper').innerHTML = `<header class="article-header"><span class="eyebrow">${escapeHtml(article.level)} · ${sourceLabel}</span><h2>${escapeHtml(article.title)}</h2><div class="article-zh-title ${view.allTranslations ? '' : 'hidden'}">${escapeHtml(article.titleZh || '')}</div><div class="article-meta"><span>目标语法：${escapeHtml(article.grammarFocus || course.title)}</span><span>${article.sentences.length} 句 · ${paragraphs.length} 段</span>${typeLabel ? `<span>${typeLabel}</span>` : ''}${coverageLabel ? `<span>${coverageLabel}</span>` : ''}<span>点击单词查词典，点击句子单独切换</span></div></header><div class="article-body">${body}</div><div class="article-toolbar"><button class="secondary-button" type="button" data-action="toggle-all-translations">${view.allTranslations ? '隐藏全文中文' : '显示全文中文'}</button><button class="secondary-button" type="button" data-action="toggle-all-grammar">${view.allGrammar ? '隐藏全部语法' : '显示全部语法'}</button><button class="secondary-button" type="button" data-action="refresh-article-metadata">强制重新获取中文和语法</button>${metadataStatus}<button class="primary-button" type="button" data-action="regenerate-article">换一篇</button><button class="text-button" type="button" data-action="open-reading-settings">调整生成条件</button></div>`;
-  renderSentenceTools();
+  $('#articlePaper').innerHTML = `<header class="article-header"><span class="eyebrow">${escapeHtml(article.level)} · ${sourceLabel}</span><h2>${escapeHtml(article.title)}</h2><div class="article-zh-title ${view.allTranslations ? '' : 'hidden'}">${escapeHtml(article.titleZh || '')}</div><div class="article-meta"><span>目标语法：${escapeHtml(article.grammarFocus || course.title)}</span><span>${article.sentences.length} 句 · ${paragraphs.length} 段</span>${typeLabel ? `<span>${typeLabel}</span>` : ''}${coverageLabel ? `<span>${coverageLabel}</span>` : ''}<span>点击单词查词典，点击句子单独切换</span></div></header><div class="article-body">${body}</div>${articleFontControlsHtml(false)}<div class="article-toolbar"><button class="secondary-button" type="button" data-action="toggle-all-translations">${view.allTranslations ? '隐藏全文中文' : '显示全文中文'}</button><button class="secondary-button" type="button" data-action="toggle-all-grammar">${view.allGrammar ? '隐藏全部语法' : '显示全部语法'}</button><button class="secondary-button" type="button" data-action="refresh-article-metadata">强制重新获取中文和语法</button>${metadataStatus}<button class="primary-button" type="button" data-action="regenerate-article">换一篇</button><button class="text-button" type="button" data-action="open-reading-settings">调整生成条件</button></div>`;
+  renderSentenceTools(); applyArticleFontScales();
 }
 function renderSentenceTools() {
   const box = $('#sentenceTools');
@@ -1376,7 +1396,7 @@ function renderSentenceTools() {
   const index = state.selectedSentenceIndex;
   const sentence = article.sentences[index];
   box.classList.remove('hidden');
-  box.innerHTML = `<div class="sentence-tools-head"><span class="eyebrow">已选句子</span><button class="sentence-tools-close" type="button" data-action="close-sentence-tools" aria-label="关闭句子工具">×</button></div><p class="selected-sentence">${escapeHtml(sentence.en)}</p><div class="drawer-actions sentence-tools-actions"><button class="secondary-button" type="button" data-action="toggle-sentence-translation">${view.allTranslations || view.sentenceTranslations[index] ? '隐藏本句中文' : '显示本句中文'}</button><button class="secondary-button" type="button" data-action="toggle-sentence-grammar">${view.allGrammar || view.sentenceGrammar[index] ? '隐藏本句语法' : '显示本句语法'}</button></div>`;
+  box.innerHTML = `<div class="sentence-tools-head"><span class="eyebrow">已选句子</span><button class="sentence-tools-close" type="button" data-action="close-sentence-tools" aria-label="关闭句子工具">×</button></div><p class="selected-sentence">${escapeHtml(sentence.en)}</p><div class="drawer-actions sentence-tools-actions"><button class="secondary-button" type="button" data-action="toggle-sentence-translation">${view.allTranslations || view.sentenceTranslations[index] ? '隐藏本句中文' : '显示本句中文'}</button><button class="secondary-button" type="button" data-action="toggle-sentence-grammar">${view.allGrammar || view.sentenceGrammar[index] ? '隐藏本句语法' : '显示本句语法'}</button></div>${articleFontControlsHtml(true)}`;
 }
 function sentenceElementFromNode(node) {
   const element = node && node.nodeType === 1 ? node : node && node.parentElement;
@@ -1903,6 +1923,8 @@ function startReview(dueOnly) {
   const now = Date.now();
   const source = Object.values(state.vocabulary).filter(word => !dueOnly || (word.nextReview || 0) <= now).sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0));
   if (!source.length) { showToast(dueOnly ? '当前没有到期单词' : '单词本还是空的'); return; }
+  const onboarding = $('#onboardingModal'); if (onboarding) onboarding.remove();
+  const mobileNav = $('#mobileNav'); if (mobileNav) mobileNav.classList.add('hidden');
   state.review = { queue: source.map(word => word.word), index: 0, revealed: false, dueOnly };
   showView('vocabulary');
   renderReview();
@@ -2301,6 +2323,14 @@ function bindEvents() {
   $('#articleControls').addEventListener('submit', event => { event.preventDefault(); generateArticle(); });
   $('#aiSettingsForm').addEventListener('submit', event => { event.preventDefault(); saveSettingsForm(); });
   $('#vocabSearch').addEventListener('input', renderVocabulary);
+  document.addEventListener('input', event => {
+    const input = event.target && event.target.closest ? event.target.closest('[data-font-scale]') : null;
+    if (!input) return;
+    const key = input.dataset.fontScale === 'translation' ? 'translationScale' : 'grammarScale';
+    state.settings[key] = Math.max(0.8, Math.min(1.5, Number(input.value) || 1));
+    writeJSON(STORAGE.settings, state.settings);
+    applyArticleFontScales();
+  });
   $('#mobileLevelSelect').addEventListener('change', event => setGlobalLevel(event.target.value));
   $('#articleLevel').addEventListener('change', event => setGlobalLevel(event.target.value));
   $('#articleGrammar').addEventListener('change', updateReadingVideo);
