@@ -661,3 +661,10 @@ html[data-theme="dark"] .app-tools button { background:#1d2b24; color:#eef5ef; }
 html[data-theme="dark"] .memory-item { background: #17231d; }
 html[data-theme="dark"] .memory-prompt-card { background: #17231d; color: var(--ink); }
 @media (max-width: 620px) { .memory-tools { grid-template-columns: 1fr; } }
+
+/* Desktop-only roadmap grouping: keep mobile layout untouched. */
+@media (min-width: 861px) {
+  #homeRoadmap[data-grouped="1"] { display: block; }
+  #homeRoadmap[data-grouped="1"] > .home-main-roadmap { margin-bottom: 14px; }
+  #homeRoadmap[data-grouped="1"] .roadmap-card { min-width: 0; }
+}
