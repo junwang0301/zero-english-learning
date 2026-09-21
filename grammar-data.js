@@ -7,7 +7,7 @@ g-noun-possessive|词性基础|A1|名词所有格|'s 与 of|表达所属关系�
 g-pronoun-personal|词性基础|A1|人称代词主格与宾格|I / me / he / him|根据代词在句中作主语还是宾语选择主格或宾格。|She helps me.|Me help she.=>She helps me.=>主格作主语，宾格作宾语。|I saw he.=>I saw him.=>动词后用宾格。|pronoun
 g-pronoun-possessive|词性基础|A1|物主代词与物主形容词|my / mine|区分名词前的物主形容词和独立使用的物主代词。|This is my book.|This is I book.=>This is my book.=>名词前用物主形容词。|The book is my.=>The book is mine.=>独立使用物主代词。|pronoun
 g-pronoun-reflexive|词性基础|A2|反身代词|myself / yourself|动作回到主语本身时使用反身代词。|She taught herself English.|She taught her English.=>She taught herself English.=>动作回到主语自身。|He did it by him.=>He did it by himself.=>by oneself 表示独自。|pronoun
-g-pronoun-demonstrative|词性基础|A1|指示代词|this / that /这些 / those|根据距离和单复数选择指示代词。|These books are new.|This books are new.=>These books are new.=>this 不能修饰复数。|Those book is old.=>That book is old.=>单数用 that。|demonstrative
+g-pronoun-demonstrative|词性基础|A1|指示代词|this / that / these / those|根据距离和单复数选择指示代词。|These books are new.|This books are new.=>These books are new.=>this 不能修饰复数。|Those book is old.=>That book is old.=>单数用 that。|demonstrative
 g-pronoun-indefinite|词性基础|A2|不定代词|someone / anyone / nothing|掌握不定代词的指人、指物和肯定否定语境。|Someone is at the door.|Someone are at the door.=>Someone is at the door.=>不定代词作单数。|I don't know nothing.=>I don't know anything.=>否定句用 anything。|pronoun
 g-adj-use|词性基础|A1|形容词用法与位置|定语与表语|形容词可放在名词前作定语，也可放在 be 动词后作表语。|She is a happy girl.|She is happily.=>She is happy.=>be 动词后用形容词。|She sings beautiful.=>She sings beautifully.=>修饰动词用副词。|comparative
 g-adj-comparison|词性基础|A2|比较级|than / more|比较两个人或事物时使用比较级。|This book is easier than that one.|This book is more easier.=>This book is easier.=>不能重复比较。|She is more tall than me.=>She is taller than me.=>短形容词用 er。|comparative
@@ -89,15 +89,6 @@ g-writing-transitions|写作基础|B1|开头、过渡与结尾|First / However /
 g-writing-complex|写作基础|B1|并列句与复合句|and / because / although|用连接词把简单句组合成有层次的句子。|I like English because it is useful.|I like English because is useful.=>I like English because it is useful.=>从句必须有主语。|Although it was hard, I kept going.=>Although it was hard, I kept going.=>让步从句。|clauses
 g-writing-pitfalls|写作基础|B1|常见中式英语避雷|主语、语序与搭配|避免逐字翻译造成的主语、语序和搭配错误。|I have a lot of homework to do.|I have many homeworks.=>I have a lot of homework.=>homework 不可数。|I very like English.=>I like English very much.=>程度副词位置错误。|sentence
 `;
-const grammarGroupRules = {
-  '词性基础': ['先判断词性和句中功能。', '注意位置、修饰关系和固定搭配。', '结合单复数、可数性和上下文选词。'],
-  '动词专项': ['先判断谓语还是非谓语。', '注意时态、语态、人称和固定搭配。', '情态动词后通常接动词原形。'],
-  '句法专题': ['先找主干，再判断修饰成分。', '从句使用陈述语序，注意连接词。', '一个简单句通常只有一个主要谓语。'],
-  '八大时态': ['先找时间标志和动作状态。', '判断一般、进行、完成或完成进行。', '注意第三人称单数、助动词和过去分词。'],
-  '语态与特殊句式': ['先判断主动还是被动。', '注意倒装、强调和虚拟语气的固定结构。', '结构调整后要保留完整句子成分。'],
-  '高频易混词': ['先判断主语和动作方向。', '比较可数、不可数和搭配差异。', '把固定搭配作为整体记忆。'],
-  '写作基础': ['先写清主谓宾，再增加修饰。', '用连接词建立段落逻辑。', '避免中文逐字翻译和重复句式。']
-};
 const grammarGroupFormulas = {
   '词性基础': '词性 + 句法功能 + 搭配', '动词专项': '主语 + 动词结构 + 宾语/表语',
   '句法专题': '主干 + 修饰成分', '八大时态': '时间标志 + 动作状态 + 正确时态',
@@ -113,12 +104,12 @@ function grammarTopicFromRow(line, index) {
   const [id, group, level, title, subtitle, summary, correct, wrong1, wrong2, videoKey] = parts;
   const first = parseGrammarMistake(wrong1, correct);
   const second = parseGrammarMistake(wrong2, correct);
-  const rules = grammarGroupRules[group] || ['先理解定义和结构。', '结合例句判断用法。', '完成后检查常见错误。'];
+  const rules = [['核心规则', summary], ['正确结构', `${first.correct}（${first.note}）`], ['易错提醒', `${second.wrong} 应改为 ${second.correct}：${second.note}`]];
   const videoSource = (typeof lessonVideos !== 'undefined' && (lessonVideos[videoKey] || lessonVideos.rabbitGrammar)) || { bvid: 'BV1XY411J7aG', page: 2, title: '英语语法精讲合集', teacher: '英语兔', source: 'https://www.bilibili.com/video/BV1XY411J7aG' };
   return {
     id, num: 101 + index, group, level, title, subtitle, summary,
     formula: grammarGroupFormulas[group] || '观察结构 + 判断用法 + 检查错误', cues: [],
-    rules: rules.map((text, ruleIndex) => ['要点 ' + (ruleIndex + 1), text]),
+    rules: rules,
     examples: [
       { en: correct, zh: '正确示例：' + correct, note: summary, good: true },
       { en: first.wrong, zh: '错误示例：' + first.wrong, note: first.note, good: false }
@@ -134,7 +125,7 @@ function grammarTopicFromRow(line, index) {
     ],
     translations: [{ zh: '请用本专题语法写一个正确句子：' + title, answer: correct, explanation: summary }],
     microTopic: true,
-    video: Object.assign({}, videoSource, { note: `合集内重点学习：${title}。${videoSource.note || ''}`, topicTitle: title })
+    video: Object.assign({}, videoSource, { note: `来源：${videoSource.title || 'B站语法合集'}。当前专题重点：${title}。${videoSource.note || '请结合知识卡定位对应片段。'}`, topicTitle: title, coverage: '合集复用，需按专题重点定位' })
   };
 }
 const grammarTopics = grammarTopicRows.trim().split(/\r?\n/).filter(Boolean).map(grammarTopicFromRow);

@@ -489,7 +489,7 @@ Object.assign(advancedArticleSeeds, {
 });
 
 const state = {
-  settings: readJSON(STORAGE.settings, { baseUrl: 'https://api.openai.com/v1', model: '', apiKey: '', level: 'A1', dailyGoal: 20 }),
+  settings: readJSON(STORAGE.settings, { baseUrl: 'https://api.openai.com/v1', model: '', apiKey: '', level: 'A1', dailyGoal: 20, theme: 'system', fontScale: 1, voice: 'en-US', speechRate: 0.9, autoSpeakReview: false, onboardingSeen: false }),
   progress: readJSON(STORAGE.progress, { completed: {}, lastLessonId: '', studyDates: {} }),
   vocabulary: readJSON(STORAGE.vocabulary, {}),
   articles: readJSON(STORAGE.articles, []),
@@ -715,7 +715,7 @@ function renderLessonPractice(lesson) {
   const definite = all.filter(value => value !== null && value !== undefined);
   const correct = definite.filter(Boolean).length;
   const percent = session.submitted ? Math.round(correct / total * 100) : 0;
-  const resultText = session.submitted ? `本次 ${correct}/${total} 题正确，正确率 ${percent}%。${percent >= 70 ? '已达到完成标准。' : '达到 70% 即可完成本课。'}` : '';
+  const resultText = session.submitted ? `本次练习正确率：${correct}/${total}，即 ${percent}%。${percent >= 70 ? '本课已标记完成。' : '本次练习未达到 70%，可以重做。'}` : '';
   return `<div class="content-card"><h2>课堂练习</h2><p class="muted">共 ${total} 题。提交后 AI 统一批改选择题、填空题和翻译题，并给出逐题反馈；未配置 AI 时使用本地答案判定和自评。</p>
     <div id="practiceQuestions">${lesson.mcq.map((q, i) => renderMcq(q, i, session)).join('')}${lesson.fill.map((q, i) => renderFill(q, i, session)).join('')}${lesson.translations.map((q, i) => renderTranslation(q, i, session)).join('')}</div>
     <div class="practice-result ${session.submitted ? 'show' : ''}"><span class="eyebrow">练习结果</span><strong>${session.submitted ? percent + '%' : ''}</strong><p>${resultText}</p></div>
@@ -747,6 +747,8 @@ function renderLessonDetail(lesson) {
   const previous = lessonByOffset(lesson.id, -1);
   const next = lessonByOffset(lesson.id, 1);
   $('#lessonDetail').innerHTML = `
+    <nav class="breadcrumb" aria-label="课程位置"><button type="button" data-view="grammar">语法课堂</button><span>/</span><span>${escapeHtml(lesson.group || '课程')}</span><span>/</span><strong>${escapeHtml(lesson.title)}</strong></nav>
+    <div class="lesson-top-nav"><button class="secondary-button" type="button" data-lesson-id="${previous ? previous.id : ''}" ${previous ? '' : 'disabled'}>← 上一课</button><button class="secondary-button" type="button" data-lesson-id="${next ? next.id : ''}" ${next ? '' : 'disabled'}>下一课 →</button></div>
     <div class="lesson-detail-header"><div><span class="eyebrow">${courseLevel(lesson)} · LESSON ${String(lesson.num).padStart(2, '0')}</span><h1 id="lessonTitle">${escapeHtml(lesson.title)}</h1><span class="subtitle">${escapeHtml(lesson.subtitle)}</span><p>${escapeHtml(lesson.summary)}</p></div><div class="lesson-header-badge"><strong>${lesson.num}</strong><span>${done ? '已完成' : '学习中'}</span></div></div>
     <div class="lesson-content-grid">
       <div class="lesson-main-column">
@@ -1589,7 +1591,7 @@ async function generateArticle() {
       showToast('生成中断，已保留已收到的内容');
     } else {
       article = createLocalArticle(course, level, topicId); complete = true; setGenerationStatus('');
-      showToast('AI 生成失败，已回退本地文章'); console.warn('AI 文章生成失败', error);
+      showToast('AI 生成失败，已回退到本地文章：' + error.message); console.warn('AI 文章生成失败', error);
     }
   } finally {
     clearTimeout(bufferTimer);
@@ -1806,13 +1808,27 @@ async function lookupWordWithAI() {
   } catch (error) { showToast('AI 查询失败：' + error.message); }
   finally { setLoading(false); }
 }
+function normalizedSpeechText(text) {
+  return String(text || '').replace(/[^A-Za-z0-9'\- ]+/g, ' ').replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
+}
 function speakText(text) {
-  if (!('speechSynthesis' in window)) { showToast('当前浏览器不支持语音朗读'); return; }
+  const clean = normalizedSpeechText(text);
+  if (!clean) { showToast('这个单词没有可朗读的英文内容'); return; }
+  if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') { showToast('当前浏览器不支持语音朗读，请使用 Edge 或 Chrome'); return; }
   speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
-  utterance.rate = 0.85;
-  speechSynthesis.speak(utterance);
+  const utterance = new SpeechSynthesisUtterance(clean);
+  const preferred = state.settings.voice || 'en-US';
+  utterance.lang = preferred;
+  utterance.rate = Math.max(0.5, Math.min(1.5, Number(state.settings.speechRate) || 0.9));
+  const voices = speechSynthesis.getVoices ? speechSynthesis.getVoices() : [];
+  const voice = voices.find(item => item.lang === preferred) || voices.find(item => /^en-(US|GB)/i.test(item.lang)) || voices.find(item => /^en/i.test(item.lang));
+  if (voice) utterance.voice = voice;
+  let started = false;
+  utterance.onstart = () => { started = true; };
+  utterance.onerror = event => { showToast('语音播放失败：' + (event.error || '浏览器语音服务不可用')); };
+  const timer = setTimeout(() => { if (!started) showToast('语音没有启动，请确认系统允许浏览器播放声音'); }, 1600);
+  utterance.onend = () => clearTimeout(timer);
+  try { speechSynthesis.speak(utterance); } catch (error) { clearTimeout(timer); showToast('语音播放失败：' + error.message); }
 }
 
 function masteryDots(level) {
@@ -1854,7 +1870,16 @@ function renderReview() {
   }
   const word = state.vocabulary[review.queue[review.index]];
   panel.classList.remove('hidden');
-  panel.innerHTML = `<div class="review-top"><span>复习 ${review.index + 1} / ${review.queue.length}</span><button class="text-button" type="button" data-action="close-review">收起</button></div><h2 class="review-word">${escapeHtml(word.displayWord || word.word)}</h2><div class="review-phonetic">${escapeHtml(word.phonetic || '')}</div><div class="review-answer ${review.revealed ? '' : 'hidden'}"><strong>${escapeHtml(word.meaningZh || '暂无释义')}</strong>${word.context ? `<p>${escapeHtml(word.context)}</p>` : ''}${word.contextZh ? `<p class="muted">${escapeHtml(word.contextZh)}</p>` : ''}</div><div class="review-actions">${review.revealed ? '<button class="review-forgot" type="button" data-review-rating="forgot">忘了</button><button class="review-fuzzy" type="button" data-review-rating="fuzzy">模糊</button><button class="review-known" type="button" data-review-rating="known">记住</button>' : '<button class="review-reveal" type="button" data-action="reveal-review">显示答案</button><button class="review-reveal" type="button" data-action="speak-word" data-word="' + escapeHtml(word.displayWord || word.word) + '">🔊 听发音</button>'}</div>`;
+  panel.innerHTML = `<div class="review-top"><span>复习 ${review.index + 1} / ${review.queue.length}</span><button class="text-button" type="button" data-action="close-review">收起</button></div><h2 class="review-word">${escapeHtml(word.displayWord || word.word)}</h2><div class="review-phonetic">${escapeHtml(word.phonetic || '')}</div><div class="review-answer ${review.revealed ? '' : 'hidden'}"><strong>${escapeHtml(word.meaningZh || '暂无释义')}</strong>${word.context ? `<p>${escapeHtml(word.context)}</p>` : ''}${word.contextZh ? `<p class="muted">${escapeHtml(word.contextZh)}</p>` : ''}</div><div class="review-actions">${review.revealed ? '<button class="review-forgot" type="button" data-review-rating="forgot">忘了</button><button class="review-fuzzy" type="button" data-review-rating="fuzzy">模糊</button><button class="review-known" type="button" data-review-rating="known">记住</button><button class="review-reveal" type="button" data-action="skip-review">稍后跳过</button>' : '<button class="review-reveal" type="button" data-action="reveal-review">显示答案</button><button class="review-reveal" type="button" data-action="speak-word" data-word="' + escapeHtml(word.displayWord || word.word) + '">🔊 听发音</button>'}</div>`;
+}
+function skipReview() {
+  state.review.index += 1;
+  state.review.revealed = false;
+  renderReview();
+  if (state.settings.autoSpeakReview && state.review.index < state.review.queue.length) {
+    const next = state.vocabulary[state.review.queue[state.review.index]];
+    if (next) speakText(next.displayWord || next.word);
+  }
 }
 function rateReview(rating) {
   const key = state.review.queue[state.review.index];
@@ -1869,6 +1894,10 @@ function rateReview(rating) {
   state.review.index += 1;
   state.review.revealed = false;
   renderReview();
+  if (state.settings.autoSpeakReview && state.review.index < state.review.queue.length) {
+    const next = state.vocabulary[state.review.queue[state.review.index]];
+    if (next) speakText(next.displayWord || next.word);
+  }
   renderVocabulary();
   updateStats();
   renderHome();
@@ -1991,9 +2020,9 @@ function saveSettingsForm() {
 function exportData() {
   const includeApiKey = Boolean($('#exportApiKey') && $('#exportApiKey').checked);
   if (includeApiKey && !confirm('备份将包含明文 API Key。不要把此文件分享给他人。是否继续导出？')) return;
-  const settingsBackup = { baseUrl: state.settings.baseUrl, model: state.settings.model };
+  const settingsBackup = Object.assign({}, state.settings); delete settingsBackup.apiKey;
   if (includeApiKey) settingsBackup.apiKey = state.settings.apiKey;
-  const payload = { version: 3, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, practice: state.practice || {}, wrongBook: state.wrongBook || [], writing: state.writing || { draft: null, history: [] }, settings: settingsBackup };
+  const payload = { version: 4, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, practice: state.practice || {}, wrongBook: state.wrongBook || [], writing: state.writing || { draft: null, history: [] }, settings: settingsBackup };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -2016,12 +2045,10 @@ function importData(file) {
       state.progress = payload.progress;
       state.vocabulary = payload.vocabulary;
       state.articles = payload.articles;
-      state.practice = payload.practice || {};
+      state.practice = Object.assign({ tab: 'grammar', cache: {}, active: null, filter: 'all' }, payload.practice || {});
       state.wrongBook = Array.isArray(payload.wrongBook) ? payload.wrongBook : [];
       state.writing = payload.writing || { draft: null, history: [] };
-      if (payload.settings && payload.settings.baseUrl) state.settings.baseUrl = payload.settings.baseUrl;
-      if (payload.settings && payload.settings.model) state.settings.model = payload.settings.model;
-      if (payload.settings && payload.settings.apiKey) state.settings.apiKey = payload.settings.apiKey;
+      if (payload.settings) state.settings = Object.assign({}, state.settings, payload.settings);
       writeJSON(STORAGE.progress, state.progress);
       writeJSON(STORAGE.vocabulary, state.vocabulary);
       writeJSON(STORAGE.articles, state.articles);
@@ -2038,11 +2065,11 @@ function importData(file) {
   reader.readAsText(file);
 }
 function clearLearningData() {
-  if (!confirm('确定清空课程进度、生词本和文章记录吗？AI 设置会保留。')) return;
+  if (!confirm('确定重置全部学习数据吗？课程进度、生词、错题、练习记录和写作记录都会删除，AI 设置会保留。')) return;
   state.progress = { completed: {}, lastLessonId: '', studyDates: {} };
   state.vocabulary = {};
   state.articles = [];
-  state.practice = {};
+  state.practice = { tab: 'grammar', cache: {}, active: null, filter: 'all' };
   state.wrongBook = [];
   state.writing = { draft: null, history: [] };
   state.review = { queue: [], index: 0, revealed: false, dueOnly: true };
@@ -2060,7 +2087,22 @@ function populateArticleSelects() {
   const grammar = $('#articleGrammar');
   if (!grammar) return;
   const selected = grammar.value;
-  grammar.innerHTML = `<optgroup label="A1 基础语法">${lessonList.map(item => `<option value="${item.id}">${String(item.num).padStart(2, '0')} · ${escapeHtml(item.title)}</option>`).join('')}</optgroup><optgroup label="CET-4 四级进阶">${advancedModules.map(item => `<option value="${item.id}">${String(item.num).padStart(2, '0')} · ${escapeHtml(item.title)}</option>`).join('')}</optgroup>${typeof grammarTopics !== 'undefined' ? `<optgroup label="语法微专题">${grammarTopics.map(item => `<option value="${item.id}">${escapeHtml(item.title)}</option>`).join('')}</optgroup>` : ''}`;
+  const groups = [
+    { label: 'A1 基础语法', items: lessonList.filter(item => item.num <= 10) },
+    { label: 'A2 主线语法', items: lessonList.filter(item => item.num > 10) },
+    { label: 'CET-4 四级进阶', items: advancedModules },
+    { label: '语法微专题 101+', items: typeof grammarTopics !== 'undefined' ? grammarTopics : [] }
+  ];
+  const seen = new Set();
+  grammar.innerHTML = groups.map(group => {
+    const options = group.items.filter(item => {
+      const key = String(item.id || item.title);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).map(item => `<option value="${item.id}">${item.microTopic ? '' : String(item.num).padStart(2, '0') + ' · '}${escapeHtml(item.title)}</option>`).join('');
+    return options ? `<optgroup label="${group.label}">${options}</optgroup>` : '';
+  }).join('');
   if (selected && findCourse(selected)) grammar.value = selected;
 }
 function selectAdvancedModule(id) {
@@ -2169,6 +2211,7 @@ async function handleClick(event) {
   else if (action === 'export-data') exportData();
   else if (action === 'import-data') $('#importFile').click();
   else if (action === 'clear-data') clearLearningData();
+  else if (action === 'skip-review') skipReview();
   else if (action === 'test-ai-connection') testAIConnection();
   else if (action === 'open-saved-article') openSavedArticle(actionButton.dataset.articleId);
   else if (action === 'delete-saved-article') deleteSavedArticle(actionButton.dataset.articleId);
