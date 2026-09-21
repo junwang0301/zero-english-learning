@@ -2151,8 +2151,8 @@ async function handleClick(event) {
   else if (action === 'toggle-word-mark') toggleSelectedMark();
   else if (action === 'toggle-word-save') toggleSelectedSave();
   else if (action === 'ai-lookup-word') lookupWordWithAI();
-  else if (action === 'submit-practice') submitPractice(lessonList.find(item => item.id === state.progress.lastLessonId));
-  else if (action === 'reset-practice') resetPractice(lessonList.find(item => item.id === state.progress.lastLessonId));
+  else if (action === 'submit-practice') submitPractice(findCourse(state.progress.lastLessonId));
+  else if (action === 'reset-practice') resetPractice(findCourse(state.progress.lastLessonId));
   else if (action === 'play-video') { const src = actionButton.dataset.videoSrc; actionButton.outerHTML = `<div class="video-frame"><iframe src="${src}" loading="lazy" allowfullscreen title="${escapeHtml(actionButton.dataset.videoTitle || '视频课程')}"></iframe></div>`; }
   else if (action === 'stop-generation') stopArticleGeneration();
   else if (action === 'enrich-article') enrichCurrentArticle();
