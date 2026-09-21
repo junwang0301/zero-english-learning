@@ -9,6 +9,24 @@ state.memory.entries = Array.isArray(state.memory.entries) ? state.memory.entrie
 const practiceThemes = { campus: '校园学习', life: '日常生活', technology: '科技网络', society: '社会热点', people: '人物故事', opinion: '观点表达' };
 const writingLevelRules = { A1: '3–5 个简单句，约 30–50 词', A2: '5–8 句，约 50–80 词', B1: '一段完整短文，约 80–120 词', CET4: '一篇完整作文，约 120–180 词' };
 function savePracticeData() { writeJSON(STORAGE.practice, state.practice); writeJSON(STORAGE.wrongBook, state.wrongBook); writeJSON(STORAGE.writing, state.writing); writeJSON(STORAGE.memory, state.memory); }
+function setPracticeButtonsBusy(busy) {
+  $$('[data-practice-action="start-grammar"], [data-practice-action="refresh-grammar"], [data-practice-action="start-writing"]').forEach(button => { button.disabled = busy; });
+}
+function practiceStreamStatus(text, chars) {
+  const content = $('#practiceContent');
+  if (!content) return;
+  let status = $('#practiceStreamStatus');
+  if (!status) {
+    status = document.createElement('div');
+    status.id = 'practiceStreamStatus';
+    status.className = 'ai-stream-status';
+    status.setAttribute('role', 'status');
+    const anchor = content.querySelector('.practice-config-row');
+    if (anchor) anchor.insertAdjacentElement('afterend', status); else content.appendChild(status);
+  }
+  status.textContent = String(text || '') + (chars ? ' \u5df2\u63a5\u6536 ' + chars + ' \u5b57' : '');
+}
+
 function practiceTopic(id) { return (typeof grammarTopics !== 'undefined' ? grammarTopics : []).find(item => item.id === id) || findCourse(id); }
 function practiceNormalize(value) { return normalizeAnswer(value); }
 function practiceQuestionsFromTopic(topic) {
@@ -59,11 +77,22 @@ function validPracticeQuestions(value) {
 }
 async function generateAIQuestions(topic, level, nonce = 0) {
   const messages = [
-    { role: 'system', content: '你是英语语法老师。只输出 JSON，不要 Markdown。必须返回 8 道题，题型数量严格为 mcq 2、fill 2、correction 2、translation 2。 All explanation fields MUST be in Simplified Chinese. Keep questions, options, and answers in English.' },
-    { role: 'user', content: `专题：${topic.title}。等级：${level}。本轮标记：${nonce || '首次'}。知识点：${topic.summary}。规则：${topic.rules.map(item => item[1]).join('；')}。请生成与上一轮不同的题目。JSON 结构必须为 {"questions":[{"id":"q1","type":"mcq|fill|correction|translation","prompt":"题目","options":["A","B","C"],"answer":0,"referenceAnswer":"参考答案","explanation":"解析"}]}。选择题必须有 options 和数字 answer。` }
+    { role: 'system', content: 'You are an English grammar teacher. Return JSON only, without Markdown. Return exactly 8 questions with counts mcq 2, fill 2, correction 2, translation 2. All explanation fields MUST be in Simplified Chinese. Keep questions, options, and answers in English.' },
+    { role: 'user', content: `Topic: ${topic.title}. Level: ${level}. Round marker: ${nonce || 'first'}. Summary: ${topic.summary}. Rules: ${topic.rules.map(item => item[1]).join('; ')}. Generate questions different from the previous round. JSON structure: {"questions":[{"id":"q1","type":"mcq|fill|correction|translation","prompt":"question","options":["A","B","C"],"answer":0,"referenceAnswer":"reference answer","explanation":"Chinese explanation"}]}. Multiple-choice questions must include options and a numeric answer.` }
   ];
-  const parsed = extractJSON(await callAI(messages, 0.45));
-  if (!validPracticeQuestions(parsed)) throw new Error('AI 题目格式不符合要求');
+  let content = '';
+  let lastChars = 0;
+  try {
+    content = await callAIStream(messages, 0.45, (delta, accumulated) => {
+      const count = accumulated.length;
+      if (count - lastChars >= 16) { lastChars = count; practiceStreamStatus('AI \u6b63\u5728\u751f\u6210 8 \u9053\u9898\u2026', count); }
+    });
+  } catch (error) {
+    practiceStreamStatus('\u5f53\u524d\u670d\u52a1\u4e0d\u652f\u6301\u6d41\u5f0f\u8f93\u51fa\uff0c\u6b63\u5728\u5207\u6362\u666e\u901a\u6a21\u5f0f\u2026');
+    content = await callAI(messages, 0.45);
+  }
+  const parsed = extractJSON(content);
+  if (!validPracticeQuestions(parsed)) throw new Error('Invalid AI question format');
   return parsed.questions.map(item => Object.assign({}, item, { id: item.id || uid(), referenceAnswer: item.referenceAnswer || (item.options && item.options[item.answer]) || '' }));
 }
 function setGrammarSession(topic, level, questions, source) {
@@ -78,7 +107,8 @@ async function startGrammarPractice(forceNew = false) {
   const topic = practiceTopic(topicId);
   if (!topic) return;
   if (isAIConfigured()) {
-    setLoading(true, forceNew ? 'AI 正在生成一组新题…' : 'AI 正在生成语法专项题…');
+    setPracticeButtonsBusy(true);
+    practiceStreamStatus(forceNew ? 'AI \u6b63\u5728\u751f\u6210\u4e00\u7ec4\u65b0\u9898\u2026' : 'AI \u6b63\u5728\u751f\u6210\u8bed\u6cd5\u4e13\u9879\u9898\u2026');
     const key = `${topic.id}:${level}`;
     const cached = state.practice.cache[key] || [];
     try {
@@ -88,8 +118,8 @@ async function startGrammarPractice(forceNew = false) {
     } catch (error) {
       if (cached.length) setGrammarSession(topic, level, cached[0], 'CACHE');
       else setGrammarSession(topic, level, practiceQuestionsFromTopic(topic), 'LOCAL');
-      showToast(forceNew ? 'AI 换题失败，已使用离线回退' : 'AI 生成失败，已使用缓存或离线基础题');
-    } finally { setLoading(false); }
+      showToast(forceNew ? 'AI ????????????' : 'AI ????????????????');
+    } finally { setPracticeButtonsBusy(false); }
   } else {
     setGrammarSession(topic, level, practiceQuestionsFromTopic(topic), 'LOCAL');
   }
@@ -245,12 +275,32 @@ async function startWritingPractice() {
   const theme = $('#writingTheme') ? $('#writingTheme').value : 'life';
   let task = localWritingTask(level, theme);
   if (isAIConfigured()) {
-    setLoading(true, 'AI 正在生成写作题目…');
+    setPracticeButtonsBusy(true);
+    practiceStreamStatus('AI \u6b63\u5728\u751f\u6210\u5199\u4f5c\u9898\u76ee\u2026');
     try {
-      const parsed = extractJSON(await callAI([{ role: 'system', content: '你是英语写作老师。只输出 JSON，不要 Markdown。结构为 {"promptTitle":"","promptZh":"","requirements":"","outline":[""],"usefulPhrases":[""]}。' }, { role: 'user', content: `等级：${level}。主题：${practiceThemes[theme]}。要求：${writingLevelRules[level]}。请生成一个清晰、适合中学生的写作题目。` }], 0.6));
-      if (parsed && parsed.promptTitle) { parsed.outline = Array.isArray(parsed.outline) ? parsed.outline : task.outline; parsed.usefulPhrases = Array.isArray(parsed.usefulPhrases) ? parsed.usefulPhrases : task.usefulPhrases; task = Object.assign(task, parsed); }
-    } catch (error) { showToast('AI 出题失败，已使用本地题目'); }
-    finally { setLoading(false); }
+      const messages = [
+        { role: 'system', content: 'You are an English writing teacher. Return JSON only, without Markdown. promptTitle, promptZh, requirements, and outline MUST be in Simplified Chinese. usefulPhrases MUST be English phrases. Structure: {"promptTitle":"","promptZh":"","requirements":"","outline":[""],"usefulPhrases":[""]}.' },
+        { role: 'user', content: 'Level: ' + level + '. Theme: ' + (practiceThemes[theme] || 'daily life') + '. Requirements: ' + writingLevelRules[level] + '. Generate a clear writing task.' }
+      ];
+      let content = '';
+      let lastChars = 0;
+      try {
+        content = await callAIStream(messages, 0.6, (delta, accumulated) => {
+          const count = accumulated.length;
+          if (count - lastChars >= 16) { lastChars = count; practiceStreamStatus('AI \u6b63\u5728\u751f\u6210\u5199\u4f5c\u9898\u76ee\u2026', count); }
+        });
+      } catch (error) {
+        practiceStreamStatus('\u5f53\u524d\u670d\u52a1\u4e0d\u652f\u6301\u6d41\u5f0f\u8f93\u51fa\uff0c\u6b63\u5728\u5207\u6362\u666e\u901a\u6a21\u5f0f\u2026');
+        content = await callAI(messages, 0.6);
+      }
+      const parsed = extractJSON(content);
+      if (parsed && parsed.promptTitle) {
+        parsed.outline = Array.isArray(parsed.outline) ? parsed.outline : task.outline;
+        parsed.usefulPhrases = Array.isArray(parsed.usefulPhrases) ? parsed.usefulPhrases : task.usefulPhrases;
+        task = Object.assign(task, parsed);
+      }
+    } catch (error) { showToast('AI \u51fa\u9898\u5931\u8d25\uff0c\u5df2\u4f7f\u7528\u672c\u5730\u9898\u76ee'); }
+    finally { setPracticeButtonsBusy(false); }
   }
   state.writing.level = level; state.writing.theme = theme; state.writing.lastRecord = null; state.writing.draft = { task, answer: '', createdAt: Date.now() };
   savePracticeData(); renderPractice();
