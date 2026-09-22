@@ -1158,9 +1158,6 @@ async function enrichArticleWithAI(article, course, signal) {
   });
   article.metadataPending = false;
   article.partial = false;
-  article.viewState = article.viewState || { allTranslations: false, allGrammar: false, sentenceTranslations: {}, sentenceGrammar: {} };
-  article.viewState.allTranslations = true;
-  article.viewState.allGrammar = true;
   return article;
 }
 function metadataEnrichmentFor(article) {
@@ -1579,6 +1576,7 @@ async function generateArticle() {
   $('#generateButtonLabel').textContent = '生成中…';
   let article = null;
   let complete = false;
+  let metadataCompleted = false;
   let firstProgress = false;
   const bufferTimer = setTimeout(() => {
     if (state.articleGeneration !== generation || firstProgress) return;
@@ -1624,7 +1622,7 @@ async function generateArticle() {
         try {
           await enrichArticleWithRetry(article, course, generation.controller.signal);
           complete = true;
-          setGenerationStatus('');
+          metadataCompleted = true;
           saveArticle(article);
           renderArticle(article);
         } catch (enrichError) {
@@ -1670,7 +1668,7 @@ async function generateArticle() {
   if (state.articleGeneration !== generation) return;
   state.articleGeneration = null;
   if (!article) { state.metadataEnrichment = null; return; }
-  saveArticle(article); state.selectedSentenceIndex = null; renderArticle(article); touchStudy(); updateStats(); if (complete) setGenerationStatus('');
+  saveArticle(article); state.selectedSentenceIndex = null; renderArticle(article); touchStudy(); updateStats(); if (complete) setGenerationStatus(metadataCompleted ? '\u4e2d\u6587\u548c\u8bed\u6cd5\u5df2\u81ea\u52a8\u751f\u6210\u6210\u529f\uff0c\u53ef\u70b9\u51fb\u201c\u663e\u793a\u5168\u6587\u4e2d\u6587\u201d\u6216\u201c\u663e\u793a\u5168\u90e8\u8bed\u6cd5\u201d\u67e5\u770b\u3002' : '');
 }
 
 const mnemonicSeeds = {
