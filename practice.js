@@ -244,7 +244,7 @@ function renderMemoryBook() {
   const query = (state.practice.memoryQuery || '').trim().toLowerCase();
   const type = state.practice.memoryType || 'all';
   const entries = (state.memory.entries || []).filter(item => (type === 'all' || item.type === type) && (!query || [item.title, item.content, item.reference, item.topicTitle].join(' ').toLowerCase().includes(query)));
-  return `<div class="practice-panel"><div class="practice-panel-intro"><span class="eyebrow">MEMORY BOOK</span><h2>记忆本</h2><p>保存写作成果和订正成功的错题，方便以后回顾和复习。</p></div><div class="memory-tools"><input id="memorySearch" type="search" value="${escapeHtml(state.practice.memoryQuery || '')}" placeholder="搜索记忆内容" aria-label="搜索记忆本"><select id="memoryType" aria-label="记忆类型"><option value="all" ${type === 'all' ? 'selected' : ''}>全部类型</option><option value="writing" ${type === 'writing' ? 'selected' : ''}>写作练习</option><option value="wrong-correction" ${type === 'wrong-correction' ? 'selected' : ''}>错题订正</option></select></div>${entries.length ? `<div class="memory-list">${entries.map(item => `<article class="memory-item"><div class="wrong-book-top"><span>${item.type === 'writing' ? '写作练习' : '错题订正'} · ${escapeHtml(item.level || '')}</span><small>${new Date(item.createdAt).toLocaleDateString('zh-CN')}</small></div><h3>${escapeHtml(item.title || '')}</h3><p>${escapeHtml(item.content || '')}</p>${item.reference ? `<small>参考：${escapeHtml(item.reference)}</small>` : ''}<button class="text-button" type="button" data-practice-action="delete-memory" data-memory-id="${item.id}">删除</button></article>`).join('')}</div>` : '<div class="empty-state"><h2>还没有记忆内容</h2><p>在错题订正答对或完成写作后，可以选择加入记忆本。</p></div>'}</div>`;
+  return `<div class="practice-panel"><div class="practice-panel-intro"><span class="eyebrow">MEMORY BOOK</span><h2>记忆本</h2><p>保存写作成果和订正成功的错题，方便以后回顾和复习。</p></div><div class="memory-tools"><input id="memorySearch" type="search" value="${escapeHtml(state.practice.memoryQuery || '')}" placeholder="搜索记忆内容" aria-label="搜索记忆本"><select id="memoryType" aria-label="记忆类型"><option value="all" ${type === 'all' ? 'selected' : ''}>全部类型</option><option value="writing" ${type === 'writing' ? 'selected' : ''}>写作练习</option><option value="wrong-correction" ${type === 'wrong-correction' ? 'selected' : ''}>错题订正</option></select></div>${entries.length ? `<div class="memory-list">${entries.map(item => `<article class="memory-item"><div class="wrong-book-top"><span>${item.type === 'writing' ? '写作练习' : '错题订正'} · ${escapeHtml(item.level || '')}</span><small>${new Date(item.createdAt).toLocaleDateString('zh-CN')}</small></div><h3>${escapeHtml(item.title || '')}</h3><p>${escapeHtml(item.content || '')}</p>${item.reference ? `<small>参考：${escapeHtml(item.reference)}</small>` : ''}<div class="memory-actions"><button class="secondary-button small" type="button" data-practice-action="redo-memory" data-memory-id="${item.id}">????</button><button class="text-button" type="button" data-practice-action="delete-memory" data-memory-id="${item.id}">??</button></div></article>`).join('')}</div>` : '<div class="empty-state"><h2>还没有记忆内容</h2><p>在错题订正答对或完成写作后，可以选择加入记忆本。</p></div>'}</div>`;
 }
 function renderWrongBook() {
   const entries = state.wrongBook.filter(item => !item.mastered);
@@ -257,6 +257,38 @@ function redoWrong(id) {
   const question={id:item.id,type:item.type,prompt:item.prompt,options:item.options,answer:item.answer == null ? 0 : item.answer,referenceAnswer:item.referenceAnswer,explanation:item.explanation};
   state.practice.active={topicId:item.topicId,topicTitle:item.topicTitle,level:item.level,questions:[question],answers:{},results:null,score:null,source:'WRONG',submitted:false,createdAt:Date.now()};
   state.practice.tab='grammar'; savePracticeData(); renderPractice();
+}
+function redoMemory(id) {
+  const memory = (state.memory.entries || []).find(item => item.id === id);
+  if (!memory) return;
+  if (memory.type === 'writing') {
+    const record = (state.writing.history || []).find(item => item.id === memory.sourceId);
+    const level = (record && record.level) || memory.level || state.settings.level || 'A1';
+    const theme = (record && record.theme) || 'life';
+    const fallback = localWritingTask(level, theme);
+    const task = record ? {
+      id: record.id,
+      level,
+      theme,
+      promptTitle: record.promptTitle || fallback.promptTitle,
+      promptZh: record.promptZh || fallback.promptZh,
+      requirements: (record.feedback && record.feedback.requirements) || fallback.requirements,
+      outline: (record.feedback && Array.isArray(record.feedback.outline)) ? record.feedback.outline : fallback.outline,
+      modelEssay: (record.feedback && record.feedback.modelEssay) || fallback.modelEssay,
+      usefulPhrases: (record.feedback && Array.isArray(record.feedback.usefulPhrases) && record.feedback.usefulPhrases.length) ? record.feedback.usefulPhrases : fallback.usefulPhrases
+    } : fallback;
+    state.practice.tab = 'writing';
+    state.writing.level = level;
+    state.writing.theme = theme;
+    state.writing.lastRecord = null;
+    state.writing.draft = { task, answer: '', createdAt: Date.now() };
+    savePracticeData();
+    renderPractice();
+    return;
+  }
+  const wrong = (state.wrongBook || []).find(item => item.id === memory.sourceId) || (state.wrongBook || []).find(item => item.id === memory.id);
+  if (wrong) { state.practice.tab = 'grammar'; redoWrong(wrong.id); return; }
+  showToast('???????????????');
 }
 function localWritingTask(level, theme) {
   const themeName = practiceThemes[theme] || '日常生活';
@@ -383,6 +415,7 @@ document.addEventListener('click', event => {
   else if (name === 'submit-writing') submitWritingPractice();
   else if (name === 'clear-writing-draft') { if (state.writing.draft) { state.writing.draft.answer = ''; savePracticeData(); renderPractice(); } }
   else if (name === 'delete-writing') { state.writing.history = (state.writing.history || []).filter(item => item.id !== action.dataset.writingId); savePracticeData(); renderPractice(); }
+  else if (name === 'redo-memory') redoMemory(action.dataset.memoryId);
   else if (name === 'delete-memory') { state.memory.entries = (state.memory.entries || []).filter(item => item.id !== action.dataset.memoryId); savePracticeData(); renderPractice(); }
 });
 document.addEventListener('input', event => { if (event.target && event.target.id === 'writingDraft') saveWritingDraft(); if (event.target && event.target.id === 'memorySearch') { state.practice.memoryQuery = event.target.value; renderPractice(); } });
