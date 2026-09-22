@@ -1158,6 +1158,9 @@ async function enrichArticleWithAI(article, course, signal) {
   });
   article.metadataPending = false;
   article.partial = false;
+  article.viewState = article.viewState || { allTranslations: false, allGrammar: false, sentenceTranslations: {}, sentenceGrammar: {} };
+  article.viewState.allTranslations = true;
+  article.viewState.allGrammar = true;
   return article;
 }
 function metadataEnrichmentFor(article) {
