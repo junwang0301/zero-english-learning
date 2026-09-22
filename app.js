@@ -1336,7 +1336,7 @@ function articleFontControlsHtml(compact = false) {
   const translation = articleFontScale('translationScale');
   const grammar = articleFontScale('grammarScale');
   const pct = value => Math.round(value * 100) + '%';
-  return `<div class="article-font-controls ${compact ? 'compact' : ''}" role="group" aria-label="???????"><label>???? <input class="article-font-range" data-font-scale="translation" type="range" min="0.8" max="1.5" step="0.05" value="${translation}" aria-label="????"><output data-font-scale-value="translation">${pct(translation)}</output></label><label>???? <input class="article-font-range" data-font-scale="grammar" type="range" min="0.8" max="1.5" step="0.05" value="${grammar}" aria-label="????"><output data-font-scale-value="grammar">${pct(grammar)}</output></label></div>`;
+  return `<div class="article-font-controls ${compact ? 'compact' : ''}" role="group" aria-label="\u9605\u8bfb\u5b57\u53f7"><label>\u4e2d\u6587 <input class="article-font-range" data-font-scale="translation" type="range" min="0.8" max="1.5" step="0.05" value="${translation}" aria-label="\u4e2d\u6587\u7ffb\u8bd1\u5b57\u53f7"><output data-font-scale-value="translation">${pct(translation)}</output></label><label>\u8bed\u6cd5 <input class="article-font-range" data-font-scale="grammar" type="range" min="0.8" max="1.5" step="0.05" value="${grammar}" aria-label="\u8bed\u6cd5\u8bf4\u660e\u5b57\u53f7"><output data-font-scale-value="grammar">${pct(grammar)}</output></label></div>`;
 }
 function applyArticleFontScales() {
   const paper = $('#articlePaper');
