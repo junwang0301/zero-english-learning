@@ -662,6 +662,8 @@ html[data-theme="dark"] .app-tools button { background:#1d2b24; color:#eef5ef; }
 .memory-item p { margin: 0 0 7px; color: #4b5a51; line-height: 1.65; }
 .memory-item small { display: block; color: var(--muted); line-height: 1.6; }
 .memory-item .text-button { margin-top: 10px; }
+.memory-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.memory-actions .secondary-button { margin: 0; }
 .memory-prompt-card { width: min(520px, 100%); padding: 26px; border-radius: 20px; background: #fffdf9; box-shadow: 0 24px 70px rgba(17,29,23,.28); }
 .memory-prompt-card h2 { margin: 8px 0; }
 .memory-prompt-card p { color: #4d5d54; line-height: 1.7; }
