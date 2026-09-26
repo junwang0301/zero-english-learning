@@ -26,7 +26,7 @@ const T = {
 };
 function saveTranslationData() { writeJSON(STORAGE.translation, state.translation); }
 function translationKey(level, theme) { return `${level}:${theme}`; }
-function translationQuestionsFor(level, theme) { return translationSeeds.filter(item => item.level === level && (theme === 'all' || item.theme === theme)).slice(0, 6); }
+function translationQuestionsFor(level, theme) { const exact = translationSeeds.filter(item => item.level === level && (theme === 'all' || item.theme === theme)); const pool = exact.length >= 6 ? exact : translationSeeds.filter(item => item.level === level); return pool.slice(0, 6); }
 function translationQuestionHtml(question, index, session) {
   const value = session.answers[question.id] || '';
   const result = session.results ? session.results.find(item => item.id === question.id) : null;
