@@ -1,206 +1,206 @@
 'use strict';
-const phraseThemeLabels = { life: '日常生活', campus: '校园学习', family: '家庭关系', travel: '旅行出行', hobby: '兴趣爱好', health: '健康生活', time: '时间表达', shopping: '购物消费', food: '饮食用餐', communication: '沟通交流', work: '工作学习', social: '社交关系', technology: '科技网络', environment: '环境社会', opinion: '观点表达', study: '学习方法', writing: '写作表达', academic: '学术表达', society: '社会话题', economy: '经济生活', workplace: '职场表达', exam: '考试表达' };
+const phraseThemeLabels = { life: '\u65e5\u5e38\u751f\u6d3b; \u8d77\u5c45', campus: 'campus study', family: '\u5bb6\u5ead\u5173\u7cfb', travel: 'n. \u65c5\u884c; \u8fdb\u884c; \u79fb\u52a8; \u6f2b\u6e38 vi. \u65c5\u884c; \u4f20\u9001; \u524d\u8fdb\uff0c\u884c\u8fdb; [\u7bee\u7403]\u8d70\u6b65 vt. \u7ecf\u8fc7', hobby: 'n. \u4e1a\u4f59\u7231\u597d( hobby\u7684\u540d\u8bcd\u590d\u6570 )', health: 'n. \u536b\u751f; \u4fdd\u5065; \u5065\u5eb7\u72b6\u51b5; \u660c\u76db\uff0c\u5174\u65fa', time: 'n. \u65f6\u95f4; \u6b21; \u65f6\u4ee3; \u65f6\u523b vt. \u4e3a\u2026\u5b89\u6392\u65f6\u95f4; \u6d4b\u5b9a\u2026\u7684\u65f6\u95f4; \u8c03\u51c6\uff08\u673a\u68b0\u7684\uff09\u901f\u5ea6; \u62e8\u51c6', shopping: 'n. \u8d2d\u7269\uff0c\u4e70\u4e1c\u897f; \u5de5\u4f5c\u5ba4\uff0c\u5236\u4f5c\u5ba4; \u8f66\u95f4; \u5bb6\u5ead\u4f5c\u574a vi. \u9009\u8d2d\uff1a\u4e3a\u5bfb\u627e\u5546\u54c1\u6216\u4fbf\u5b9c\u8d27\u800c\u901b\u5546\u5e97;', food: 'n. \u7cae\u98df; \u98df\u7269\uff0c\u98df\u54c1; \u517b\u6599; \u8d44\u6599', communication: 'n. \u4ea4\u6d41; \u901a\u8baf\uff0c\u901a\u4fe1; \u4e66\u4fe1; \u4f20\u8fbe', work: 'vt.& vi. \u4f7f\u5de5\u4f5c; \u4f7f\u8fd0\u4f5c; \u64cd\u4f5c; \u4f7f\u4ea7\u751f\u6548\u679c n. \u5de5\u4f5c\uff0c\u64cd\u4f5c; \u8457\u4f5c; \u5de5\u5382; \u884c\u4e3a\uff0c', social: 'n. \u793e\u4f1a\u751f\u6d3b; \u793e\u4ea4\u751f\u6d3b', technology: 'n. \u79d1\u6280\uff08\u603b\u79f0\uff09; \u5de5\u4e1a\u6280\u672f; \u5de5\u827a\u5b66; [\u603b\u79f0]\u672f\u8bed', environment: 'n. \u73af\u5883\uff0c\u5916\u754c; \u5468\u56f4\uff0c\u56f4\u7ed5; \u5de5\u4f5c\u5e73\u53f0; \uff08\u8fd0\u884c\uff09\u73af\u5883', opinion: 'n. \u610f\u89c1\uff0c\u4e3b\u5f20; \u8bc4\u4ef7; \u9274\u5b9a\uff0c\u5224\u5b9a', study: 'n. \u5b66\u4e60\uff0c\u7814\u7a76; \u8bfe\u9898; \u4e66\u623f; \u7ed3\u8bba vi. \u8003\u8651; \u6c89\u601d; \u9ed8\u60f3; \u52aa\u529b vt. \u60f3\u51fa; \u8be6\u7ec6', writing: 'n. \u5199\u4f5c; \u6587\u5b57; \u6587\u7ae0; \u7b14\u8ff9 v. \u5199\u4fe1; \u5199\uff08 write\u7684\u73b0\u5728\u5206\u8bcd\uff09', academic: 'adj. \u5b66\u9662\u7684\uff0c\u5927\u5b66\u7684\uff0c\u5b66\u4f1a\u7684\uff0c\uff08\u5b66\u672f\uff0c\u6587\u827a\uff09\u534f\u4f1a\u7684; \u5b66\u7a76\u7684\uff0c\u5b66\u7406\u4e0a\u7684\uff0c\u7a7a\u8c08\u7684\uff0c\u975e\u5b9e\u7528\u7684; \u3008\u7f8e', society: 'n. \u793e\u4f1a; \u793e\u56e2; \u4e0a\u6d41\u793e\u4f1a; \u793e\u7fa4 adj. \u4e0a\u6d41\u793e\u4f1a\u7684\uff0c\u793e\u4ea4\u754c\u7684', economy: 'n. \u7ecf\u6d4e; \u8282\u7ea6; \u7406\u8d22; \u79e9\u5e8f', workplace: 'n. \u5de5\u4f5c\u573a\u6240\uff0c\u8f66\u95f4; \u5de5\u5382', exam: 'n. \u6d4b\u9a8c; <\u53e3>\u8003\u8bd5' };
 const phraseRows = `
-A1|life|get up|起床
-A1|life|go to bed|上床睡觉
-A1|life|have breakfast|吃早饭
-A1|life|take a shower|洗澡
-A1|life|go home|回家
-A1|campus|go to school|去上学
-A1|campus|do homework|做作业
-A1|campus|listen to the teacher|听老师讲课
-A1|campus|ask a question|问问题
-A1|campus|take a test|参加考试
-A1|family|look after|照顾
-A1|family|help with|帮助做
-A1|family|spend time with|和……共度时光
-A1|family|talk about|谈论
-A1|family|live with|和……一起住
-A1|travel|go by bus|乘公共汽车去
-A1|travel|wait for|等待
-A1|travel|get on|上车
-A1|travel|get off|下车
-A1|travel|look for|寻找
-A1|hobby|be good at|擅长
-A1|hobby|play with|和……玩
-A1|hobby|take part in|参加
-A1|hobby|have fun|玩得开心
-A1|hobby|go out|外出
-A1|health|feel tired|感到累
-A1|health|stay healthy|保持健康
-A1|health|get better|好转
-A1|health|see a doctor|看医生
-A1|health|take medicine|吃药
-A1|time|at night|在晚上
-A1|time|in the morning|在早上
-A1|time|on time|准时
-A1|time|every day|每天
-A1|time|right now|现在
-A1|shopping|how much|多少钱
-A1|shopping|look at|看
-A1|shopping|try on|试穿
-A1|shopping|pay for|为……付款
-A1|shopping|a lot of|许多
-A1|food|a cup of|一杯
-A1|food|a glass of|一玻璃杯
-A1|food|have dinner|吃晚饭
-A1|food|eat out|出去吃饭
-A1|food|be full|吃饱了
-A1|communication|call back|回电话
-A1|communication|listen to|听
-A1|communication|talk to|和……交谈
-A1|communication|say hello to|向……问好
-A1|communication|thank you for|感谢
-A2|life|wake up|醒来
-A2|life|clean up|打扫干净
-A2|life|get ready|准备好
-A2|life|take care of|照顾
-A2|life|stay up late|熬夜
-A2|campus|hand in|上交
-A2|campus|take notes|记笔记
-A2|campus|get along with|与……相处
-A2|campus|prepare for|为……做准备
-A2|campus|pay attention to|注意
-A2|work|apply for|申请
-A2|work|work on|从事；研究
-A2|work|be responsible for|对……负责
-A2|work|deal with|处理
-A2|work|depend on|依赖
-A2|travel|arrive at|到达
-A2|travel|leave for|动身前往
-A2|travel|check in|办理入住/登记
-A2|travel|set off|出发
-A2|travel|get back|返回
-A2|social|get in touch with|与……取得联系
-A2|social|look forward to|期待
-A2|social|make friends with|与……交朋友
-A2|social|keep in touch|保持联系
-A2|social|meet up with|和……会面
-A2|health|give up|放弃
-A2|health|work out|锻炼
-A2|health|be worried about|担心
-A2|health|feel like|想要
-A2|health|take a rest|休息一下
-A2|technology|turn on|打开
-A2|technology|turn off|关闭
-A2|technology|log in|登录
-A2|technology|sign up|注册
-A2|technology|look up|查阅
-A2|communication|find out|查明
-A2|communication|point out|指出
-A2|communication|ask for|请求
-A2|communication|reply to|回复
-A2|communication|agree with|同意
-A2|study|focus on|专注于
-A2|study|make progress|取得进步
-A2|study|learn from|向……学习
-A2|study|come true|实现
-A2|study|be interested in|对……感兴趣
-A2|daily|run out of|用完
-A2|daily|pick up|捡起；接人
-A2|daily|put away|收好
-A2|daily|throw away|扔掉
-A2|daily|give back|归还
-B1|life|carry out|执行
-B1|life|put up with|忍受
-B1|life|come up with|想出
-B1|life|get rid of|摆脱
-B1|life|make sense|有意义
-B1|campus|take advantage of|利用
-B1|campus|catch up with|赶上
-B1|campus|keep up with|跟上
-B1|campus|be aware of|意识到
-B1|campus|take responsibility for|对……负责
-B1|work|carry on|继续
-B1|work|bring about|带来
-B1|work|set up|建立
-B1|work|take over|接管
-B1|work|figure out|弄清楚
-B1|travel|check out|结账离开；查看
-B1|travel|look around|四处看看
-B1|travel|run into|偶遇
-B1|travel|come across|偶然遇到
-B1|travel|get around|四处走动
-B1|social|bring together|使团结
-B1|social|get along well with|与……相处融洽
-B1|social|stand for|代表
-B1|social|take part in|参加
-B1|social|belong to|属于
-B1|environment|cut down on|减少
-B1|environment|lead to|导致
-B1|environment|result in|造成
-B1|environment|contribute to|促成；贡献
-B1|environment|deal with|处理
-B1|opinion|point out|指出
-B1|opinion|agree with|同意
-B1|opinion|disagree with|不同意
-B1|opinion|believe in|相信
-B1|opinion|refer to|指的是；提到
-B1|study|look into|调查
-B1|study|put forward|提出
-B1|study|take into account|考虑到
-B1|study|come to a conclusion|得出结论
-B1|study|make a difference|产生影响
-B1|time|as soon as|一……就
-B1|time|sooner or later|迟早
-B1|time|from time to time|偶尔
-B1|time|in the long run|从长远看
-B1|time|at first|起初
-B1|writing|for example|例如
-B1|writing|in addition|此外
-B1|writing|on the other hand|另一方面
-B1|writing|as a result|结果
-B1|writing|in conclusion|总之
-CET4|academic|conduct a study|开展研究
-CET4|academic|draw a conclusion|得出结论
-CET4|academic|take measures|采取措施
-CET4|academic|play a role|发挥作用
-CET4|academic|make a contribution|作出贡献
-CET4|society|give rise to|引起
-CET4|society|be attributed to|归因于
-CET4|society|have access to|有机会使用
-CET4|society|be exposed to|接触到
-CET4|society|take advantage of|利用
-CET4|economy|result from|由……造成
-CET4|economy|account for|占；解释
-CET4|economy|invest in|投资于
-CET4|economy|benefit from|从……受益
-CET4|economy|be based on|基于
-CET4|technology|keep pace with|跟上
-CET4|technology|be dependent on|依赖
-CET4|technology|make use of|利用
-CET4|technology|bring about|带来
-CET4|technology|set up|建立
-CET4|environment|cope with|应对
-CET4|environment|take action|采取行动
-CET4|environment|be aware of|意识到
-CET4|environment|contribute to|促成
-CET4|environment|cut down on|减少
-CET4|campus|adapt to|适应
-CET4|campus|be engaged in|从事于
-CET4|campus|apply for|申请
-CET4|campus|be qualified for|胜任
-CET4|campus|specialize in|专攻
-CET4|opinion|in terms of|就……而言
-CET4|opinion|with regard to|关于
-CET4|opinion|on the contrary|相反
-CET4|opinion|in contrast|相比之下
-CET4|opinion|to some extent|在某种程度上
-CET4|writing|in addition to|除……之外
-CET4|writing|due to|由于
-CET4|writing|as a consequence|因此
-CET4|writing|for the sake of|为了
-CET4|writing|in response to|回应
-CET4|workplace|take responsibility for|对……负责
-CET4|workplace|be committed to|致力于
-CET4|workplace|work out|解决
-CET4|workplace|carry out|执行
-CET4|workplace|put forward|提出
-CET4|exam|distinguish between|区分
-CET4|exam|refer to|提到；参考
-CET4|exam|account for|解释
-CET4|exam|give an example of|举例说明
-CET4|exam|draw a distinction|区分
+A1|life|get up|\u7ad9\u8d77\u6765; \uff08\u4f7f\uff09\u8d77\u5e8a; \u5b89\u6392; \u4e3e\u8d77
+A1|life|go to bed|\u53bb\u7761\u89c9; \u5b89\u6b47
+A1|life|have breakfast|\u5403\u65e9\u996d
+A1|life|take a shower|\u6c90\u6d74
+A1|life|go home|\u56de\u5bb6
+A1|campus|go to school|v. \u4e0a\u5b66; \u6c42\u5b66
+A1|campus|do homework|\u505a\u4f5c\u4e1a
+A1|campus|listen to the teacher|\u542c\u8bfe
+A1|campus|ask a question|\u95ee\u95ee\u9898; \u63d0\u95ee; \u53d1\u95ee
+A1|campus|take a test|\u53c2\u52a0\u6d4b\u9a8c
+A1|family|look after|\u7167\u987e; \u7167\u6599; \u6599\u7406; \u6253\u7406
+A1|family|help with|\u5e2e\u52a9\uff08\u67d0\u4eba\uff09\u505a\u2026; \u7528\u2026\u6765\u5e2e\u52a9
+A1|family|spend time with|spend time with
+A1|family|talk about|\u8ba8\u8bba\uff0c\u8c08\u8bba; \u8003\u8651\uff08\u505a\u2026\uff09; \u5520; \u8bdd
+A1|family|live with|\u4e0e\u2026\u4e00\u8d77\u751f\u6d3b; \u4e0e\uff08\u5f02\u6027\uff09\u540c\u5c45; \u5b66\u4f1a\u53bb\u9002\u5e94; \u63a5\u53d7\u5e76\u5fcd\u53d7
+A1|travel|go by bus|go by bus
+A1|travel|wait for|\u7b49\u5f85; <\u975e\u6b63> \u6ce8\u610f; <\u975e\u6b63>\u63a8\u8fdf\uff08\u7528\u9910\uff09\u76f4\u5230\uff08\u67d0\u4eba\uff09\u5230\u8fbe; \u89c2\u671b\u5f62\u52bf\u540e\u518d\u4f5c\u51b3\u5b9a
+A1|travel|get on|\u4e0a\u8f66; \u8fdb\u884c; \u53d8\u8001; \u5bf9\u4ed8
+A1|travel|get off|\u79bb\u5f00; \u4e0b\uff08\u8f66\u3001\u9a6c\u7b49\uff09; \u53d1\u51fa; \uff08\u4f7f\uff09\u5165\u7761
+A1|travel|look for|\u5bfb\u627e\uff08\u67d0\u4eba\u6216\u67d0\u7269\uff09; <\u53e3>\u627e\uff08\u9ebb\u70e6\uff09; \u627e\uff08\u82e6\u5934\uff09\u5403; \u5e0c\u671b\u5f97\u5230
+A1|hobby|be good at|v. \u64c5\u957f; \u5065; \u7cbe\u901a; \u719f\u8c19
+A1|hobby|play with|\u540c\u2026\u4e00\u8d77\u73a9; \u73a9\u5f04\u2026; \uff08\u4e0d\u592a\u8ba4\u771f\u5730\uff09\u8003\u8651; \u9017
+A1|hobby|take part in|\u53c2\u52a0\u2026\uff0c\u53c2\u4e0e\u2026\u6d3b\u52a8; \u63d2\u811a; \u5395; \u9884
+A1|hobby|have fun|\u73a9\u5f97\u9ad8\u5174\uff0c\u8fc7\u5f97\u5feb\u6d3b; \u800d\u7b11; \u73a9\u800d
+A1|hobby|go out|\u5916\u51fa; \u51fa\u56fd; \u7184\u706d; \u51fa\u7248
+A1|health|feel tired|\u611f\u5230\u75b2\u52b3
+A1|health|stay healthy|\u4fdd\u6301\u5065\u5eb7
+A1|health|get better|\u8f6c\u597d; \u89c1\u597d
+A1|health|see a doctor|v. \u770b\u533b\u751f; \u77a7\u75c5
+A1|health|take medicine|\u5403\u836f\uff0c\u670d\u836f
+A1|time|at night|\u591c\u95f4; \u5728\u591c\u91cc; \u591c\u6765
+A1|time|in the morning|\u660e\u5929\u4e0a\u5348[\u65e9\u6668]
+A1|time|on time|\u6309\u65f6\uff0c\u51c6\u65f6; \u4ee5\u5206\u671f\u4ed8\u6b3e\u65b9\u5f0f; \u6b63\u70b9; \u987a\u65f6
+A1|time|every day|\u6bcf\u5929; \u5929\u5929; \u65e5; \u9010\u65e5
+A1|time|right now|\u6b64\u65f6; \u7acb\u5373; \u6b64\u523b\uff0c\u76ee\u524d
+A1|shopping|how much|\u591a\u5c11\uff0c\u4ec0\u4e48\u4ef7\u94b1\uff0c\u5230\u4ec0\u4e48\u7a0b\u5ea6
+A1|shopping|look at|\u770b; \u5ba1\u89c6; \u8bc4\u5224; \u63a5\u53d7
+A1|shopping|try on|\u8bd5\u7a7f; \u800d\u82b1\u62db\uff0c \u54c4\u9a97
+A1|shopping|pay for|\u8d54\u507f; \u4e3a\u2026\u4ed8\u94b1; \u56e0\u2026\u53d7\u7f5a[\u75db\u82e6]; \u66ff\u67d0\u4eba\u4ed8\u6b3e
+A1|shopping|a lot of|adj. \u8bf8\u591a; \u8bb8\u591a\u7684
+A1|food|a cup of|\u4e00\u676f\u3002\u3002\u3002
+A1|food|a glass of|\u4e00\u676f
+A1|food|have dinner|\u5403\u665a\u996d
+A1|food|eat out|\u5728\u5916\u5403\u996d; \u4fb5\u8680; <\u53e3>\u9ed8\u9ed8\u5fcd\u53d7\u75db\u82e6;  \u6781\u4e3a\u60b2\u4f24
+A1|food|be full|\u9971\uff1b\u5403\u9971
+A1|communication|call back|\u56de\u7535\u8bdd; \u56de\u558a; \u53eb\uff08\u67d0\u4eba\uff09\u56de\u6765[\u53bb]; \u8bb0\u8d77\uff08\u67d0\u4e8b\uff09
+A1|communication|listen to|\u542c\u53d6; \u542c\u4ece; \u542c\u2026\uff08\u8bb2\u8bdd\uff09; \u4f9d
+A1|communication|talk to|\u540c\uff08\u67d0\u4eba\uff09\u8c08\u8bdd; \u8d23\u9a82
+A1|communication|say hello to|\u5411\u2026\u8868\u793a\u95ee\u5019
+A1|communication|thank you for|\u8c22\u8c22\u60a8\u7684\u597d\u610f
+A2|life|wake up|\u9192\u6765; \u6d3b\u8dc3\u8d77\u6765; \u5f15\u8d77\u6ce8\u610f; \uff08\u4f7f\uff09\u8ba4\u8bc6\u5230
+A2|life|clean up|\u6253\u626b; <\u53e3>\u8d5a\u94b1; \u6574\u987f; \u75db\u6253
+A2|life|get ready|v. \u51c6\u5907\u597d; \u6253\u53e0; \u6452\u6321
+A2|life|take care of|\u7167\u987e; \u6740\u6389; \u5bf9\u4ed8; \u62b5\u6d88
+A2|life|stay up late|\u71ac\u591c; \u6df1\u591c\u4e0d\u7761\uff0c\u8fdf\u7761
+A2|campus|hand in|\u4ea4\u4e0a;  \u9012\u4ea4;  \u5448\u9001; \u628a\u2026\u6276\u4e0a\u8f66
+A2|campus|take notes|v. \u8bb0\u5f55; \u4f5c\u7b14\u8bb0; \u6458\u8bb0
+A2|campus|get along with|\u8fdb\u5c55; \u4e0e\u2026\u548c\u7766\u76f8\u5904
+A2|campus|prepare for|\uff08\u4f7f\uff09\u4e3a\u2026\u4f5c\u51c6\u5907; \uff08\u4f7f\uff09\u5bf9\u2026\u6709\u601d\u60f3\u51c6\u5907
+A2|campus|pay attention to|\u6ce8\u610f
+A2|work|apply for|\u7533\u8bf7; \u58f0\u8bf7
+A2|work|work on|\u4ece\u4e8b\u4e8e\u2026; \u7ee7\u7eed\u5de5\u4f5c; \u52aa\u529b\u5f71\u54cd[\u8bf4\u670d]; \u81f4\u529b\u4e8e
+A2|work|be responsible for|\u4e3a\u2026\u8d1f\u8d23\uff0c\u5f62\u6210\u2026\u7684\u539f\u56e0; \u4e3b\u7ba1
+A2|work|deal with|\u5e94\u4ed8;  \u5bf9\u5f85; \u60e0\u987e;  \u4e0e\u2026\u4ea4\u6613
+A2|work|depend on|\u4f9d\u8d56; \u76f8\u4fe1; \u4fe1\u8d56; \u968f\u2026\u800c\u5b9a
+A2|travel|arrive at|\u5230\u8fbe; \u6765\u5230; \u8fbe\u6210; \u83b7\u5f97
+A2|travel|leave for|\u51fa\u53d1\u53bb\uff08\u67d0\u5730\uff09; \u79bb\u5f00\uff08\u67d0\u4eba\uff09\u4ee5\u540c\uff08\u4ed6\u4eba\uff09\u751f\u6d3b\u5728\u4e00\u8d77\uff0c \u79bb\u5f00\uff08\u67d0\u804c\u4f4d\uff09\u4ee5\u5bfb\u6c42; \u4e0a; \u5230
+A2|travel|check in|\u6b7b\u53bb; \u8bb0\u5f55\uff0c\u767b\u8bb0\u7b7e\u5230; \u5f52\u8fd8\u7ecf\u767b\u8bb0\u501f\u51fa\u7684\u4e1c\u897f; \u628a\u2026\u7559\u7ed9\u5176\u4ed6\u4eba\u7167\u770b
+A2|travel|set off|\u51fa\u53d1; \uff08\u4f7f\uff09\u5f00\u59cb; \u5f15\u8d77; \u70b9\u71c3
+A2|travel|get back|\u56de\u6765; \u627e\u56de; \u62a5\u590d; \u56de\u5230\u2026\u4e0a\u6765
+A2|social|get in touch with|\u63a5\u89e6; \u548c\u2026\u53d6\u5f97\u8054\u7cfb; \u63a5\u5934
+A2|social|look forward to|\u4f01; \u671f\u671b\uff0c\u76fc\u671b; \u77a9\u671b; \u5c5e\u671b
+A2|social|make friends with|v. \u4e0e\u2026\u4ea4\u53cb\uff0c\u4e0e\u2026\u4ea4\u670b\u53cb\uff0c\u548c\u7766; \u8f67
+A2|social|keep in touch|v. \u4fdd\u6301\u8054\u7edc
+A2|social|meet up with|v. \u5076\u9047
+A2|health|give up|\u653e\u5f03; \u6295\u964d; \u628a\u2026\u8ba9\u7ed9; \u6212\u9664
+A2|health|work out|\u89e3\u51b3; \u4f5c\u51fa; \u953b\u70bc; \u4e86\u89e3\u67d0\u4eba\u7684\u672c\u8d28
+A2|health|be worried about|\u4e3a\u2026\u5fe7\u8651\uff0c\u70e6\u607c\u7684
+A2|health|feel like|\u6478\u8d77\u6765\u50cf\u662f\u2026\uff0c\u6709\u2026\u7684\u611f\u89c9; \u60f3\u8981\u2026
+A2|health|take a rest|\u4f11\u606f\u4e00\u4e0b
+A2|technology|turn on|\u6253\u5f00\uff08\u6c34\u3001\u7535\u89c6\u3001\u6536\u97f3\u673a\u3001\u706f\u3001\u7164\u6c14\u7b49\uff09; \uff08\u4f7f\uff09\u611f\u5174\u8da3; \uff08\u4f7f\uff09\u5174\u594b; \u53d1\u52a8
+A2|technology|turn off|\uff08\u628a\u2026\uff09\u5173\u6389; \u5b8c\u6210; \u89e3\u96c7; \u8f6c\u5411
+A2|technology|log in|\u5f00\u59cb\u5de5\u4f5c
+A2|technology|sign up|\u62a5\u540d; \u8ddf\u2026\u7b7e\u8ba2\u5408\u540c
+A2|technology|look up|\u67e5\u627e; \u5411\u4e0a\u770b; \u6539\u5584; \u62dc\u8bbf\uff08\u67d0\u4eba\uff09
+A2|communication|find out|\u53d1\u73b0; \u4f7f\u53d1\u4f5c; \u4f7f\u53d7\u60e9\u7f5a; \u901a\u8fc7\u63a2\u8be2[\u8bbf\u95ee]\u83b7\u6089\uff08\u67d0\u4eba\uff09\u4e0d\u5728
+A2|communication|point out|\u6307\u660e; \u6307\u51fa\uff0c\u628a\u6ce8\u610f\u529b\u5f15\u5411\u2026; \u63d0\u793a; \u70b9\u660e
+A2|communication|ask for|\u8bf7\u6c42\u2026;  \u8981\u6c42\u2026; \u627e\u2026; \u81ea\u627e\u9ebb\u70e6
+A2|communication|reply to|\u56de\u590d\uff0c \u56de\u7b54
+A2|communication|agree with|\u4e0e\u67d0\u4eba[\u89c2\u70b9]\u4e00\u81f4\uff0c \u540c\u610f[\u8d5e\u540c]\u67d0\u4eba\u7684\u610f\u89c1; \u4e0e\u2026\u76f8\u7b26\uff0c \u4e0e\u2026\u4e00\u81f4; \uff08\u6c14\u5019\u3001\u98df\u7269\u7b49\uff09\u9002\u5408\u4e8e; \u76f8
+A2|study|focus on|\u81f4\u529b\u4e8e; \u4f7f\u805a\u7126\u4e8e; \u5bf9\uff08\u67d0\u4e8b\u6216\u505a\u67d0\u4e8b\uff09\u4e88\u4ee5\u6ce8\u610f; \u628a\u2026\u4f5c\u4e3a\u5174\u8da3\u4e2d\u5fc3
+A2|study|make progress|\u524d\u8fdb\uff0c\u8fdb\u6b65; \u5411\u4e0a
+A2|study|learn from|\u5411\u2026\u5b66\u4e60\uff0c\u4ece\u2026\u83b7\u5f97[\u5438\u53d6]; \u6548\u6cd5
+A2|study|come true|\u5e94\u9a8c; \u5b9e\u73b0\uff0c\u6210\u771f
+A2|study|be interested in|\u5bf9\u2026\u611f\u5174\u8da3; \u5173\u5fc3
+A2|daily|run out of|v. \u7528\u5b8c; \u8017\u5c3d; \u4ece\u2026\u8dd1\u51fa
+A2|daily|pick up|v. \u6361\u8d77; \u63a5\u8f7d; \u5b66\u4f1a; \u902e\u6355
+A2|daily|put away| \u653e\u597d; \u6536\u8d77\u6765; \u50a8\u5b58; \u6253\u6d88
+A2|daily|throw away|\u6254\u6389; \u6d6a\u8d39\uff0c\u9519\u8fc7; \u5c4f\u5f03; \u59d4
+A2|daily|give back|\u540e\u9000; \u5f52\u8fd8\uff0c\u6062\u590d; \u4ea4\u8fd8; \u9000\u540e
+B1|life|carry out|\u8fdb\u884c; \u6267\u884c; \u5b8c\u6210; \u62ac\u51fa\u53bb
+B1|life|put up with|\u5c06\u5c31; \u5fcd\u53d7\uff0c\u5bb9\u5fcd; \u5bb9\u53d7; \u5fcd\u5f97\u4f4f
+B1|life|come up with|\u60f3\u51fa; \u63d0\u51fa; \u8ffd\u8d76\u4e0a; \u8bbe\u6cd5\u62ff\u51fa
+B1|life|get rid of|\u9664\u6389\uff0c\u53bb\u6389; \u6da4\u8361; \u9769\u9664; \u6448\u9664
+B1|life|make sense| \u6709\u610f\u4e49; \u7406\u89e3; \u8bb2\u5f97\u901a; \u662f\u660e\u667a\u7684
+B1|campus|take advantage of|v. \u5229\u7528 \u6b3a\u9a97\uff0c\u5360\u2026\u7684\u4fbf\u5b9c
+B1|campus|catch up with| \u8d76\u4e0a; \u8ffd\u4e0a; \u548c\u2026\u7b97\u65e7\u8d26; \u4f7f\u2026\u6700\u7ec8\u5c1d\u5230\u82e6\u679c
+B1|campus|keep up with|\u7d27\u8ddf; \u8ddf\u4e0a\uff0c \u4e0d\u843d\u4eba\u4e4b\u540e; \u9f50\u80a9\u5e76\u8fdb
+B1|campus|be aware of|v. \u77e5\u9053 \u610f\u8bc6\u5230
+B1|campus|take responsibility for|take responsibility for
+B1|work|carry on|\u7ecf\u8425; <\u975e\u6b63>\u7ee7\u7eed\u8fdb\u884c; \u4e89\u5435; \u5435\u95f9
+B1|work|bring about|\u5b9e\u73b0; \u4f7f\uff08\u8239\uff09\u6389\u8f6c\u8239\u5934; \u9020\u6210\uff0c\u5f15\u8d77[\u5bfc\u81f4]\uff08\u67d0\u4e8b\uff09; \u521b\u9020
+B1|work|set up|\u5efa\u7acb; \u51c6\u5907;  \u5b89\u6392; \u5f15\u8d77
+B1|work|take over|\u63a5\u7ba1; \u5e26; \u5e2e\u2026\u5b66\u4e60; \u5728\u2026\u4e0a\u82b1\u8d39
+B1|work|figure out|\u60f3\u51fa; \u89e3\u51b3; \u8ba1\u7b97\u51fa; \u5f04\u660e\u767d
+B1|travel|check out|\u68c0\u67e5; \u5408\u683c; [\u53e3]\u770b\u770b; \u76f8\u7b49
+B1|travel|look around|\u56db\u4e0b\u89c2\u671b; \uff08\u4f5c\u51fa\u9009\u62e9\u524d\uff09\u8fdb\u884c\u8c03\u67e5; \u9a8b\u76ee\u56db\u987e; \u56db\u987e
+B1|travel|run into|\u5feb\u901f\u8fdb\u5165\u2026; \uff08\u4f7f\uff09\u78b0\u649e; \u9a71\u8f66\u9020\u8bbf\u2026; \u52a0\u8d77\u6765
+B1|travel|come across|\u5076\u9047; \u5076\u7136\u53d1\u73b0; \u4f7f\u4ea7\u751f\u2026\u5370\u8c61
+B1|travel|get around|\u7ed5\u5f00; \u4f20\u64ad; \u968f\u610f\u8d70\u8d70; \u8bf4\u670d
+B1|social|bring together|\u4f7f\u76f8\u5408[\u8fde\u63a5]; \u4f7f\u76f8\u8bc6;  \u4f7f\u5750\u5728\u4e00\u8d77;  \u4f7f\u4f1a\u9762
+B1|social|get along well with|\u4e0e\u2026\u76f8\u5904\u878d\u6d3d
+B1|social|stand for|\u4ee3\u8868; \u4e3a\u2026\u800c\u594b\u6597; \u62e5\u62a4; <\u53e3>\u5bb9\u5fcd
+B1|social|take part in|\u53c2\u52a0\u2026\uff0c\u53c2\u4e0e\u2026\u6d3b\u52a8; \u63d2\u811a; \u5395; \u9884
+B1|social|belong to|\u5c5e\u4e8e; \u662f\uff08\u67d0\u56e2\u4f53\u3001\u56fd\u5bb6\u7b49\uff09\u7684\u6210\u5458; \u5c5e\u4e8e\uff08\u67d0\u65f6\u671f\uff09; \u5f52\u4e8e
+B1|environment|cut down on|\u51cf\u5c11; \u8282\u7701
+B1|environment|lead to|\u5bfc\u81f4; \u628a\u2026\u5e26\u5230; \u9886\u5230; \uff08\u9053\u8def\uff09\u901a\u5411
+B1|environment|result in|\u5f15\u8d77\uff0c\u5bfc\u81f4\uff0c\u4ee5\u2026\u4e3a\u7ed3\u5c40; \u843d\u5f97; \u81f4\u4f7f
+B1|environment|contribute to|v. \u6709\u52a9\u4e8e; \u4fc3\u6210 ; \u6350\u732e; \u6295\u7a3f
+B1|environment|deal with|\u5e94\u4ed8;  \u5bf9\u5f85; \u60e0\u987e;  \u4e0e\u2026\u4ea4\u6613
+B1|opinion|point out|\u6307\u660e; \u6307\u51fa\uff0c\u628a\u6ce8\u610f\u529b\u5f15\u5411\u2026; \u63d0\u793a; \u70b9\u660e
+B1|opinion|agree with|\u4e0e\u67d0\u4eba[\u89c2\u70b9]\u4e00\u81f4\uff0c \u540c\u610f[\u8d5e\u540c]\u67d0\u4eba\u7684\u610f\u89c1; \u4e0e\u2026\u76f8\u7b26\uff0c \u4e0e\u2026\u4e00\u81f4; \uff08\u6c14\u5019\u3001\u98df\u7269\u7b49\uff09\u9002\u5408\u4e8e; \u76f8
+B1|opinion|disagree with|v. \u4e0d\u540c\u610f\uff0c\u4e0d\u4e00\u81f4\uff0c\u4e0d\u9002\u5408
+B1|opinion|believe in|\u4fe1\u4ef0; \u4fe1\u8d56
+B1|opinion|refer to|\u53c2\u8003; \u6307\u7684\u662f; \u6d89\u53ca; \u9002\u7528\u4e8e
+B1|study|look into|\u8c03\u67e5; \u89c2\u5bdf; \u5728\u2026\u91cc\u67e5\u8d44\u6599; \u6df1\u5165\u5730\u68c0\u67e5
+B1|study|put forward|\u63d0\u51fa; \u5c06\u2026\u63d0\u524d; \u5411\u524d\u79fb; \u5c06\u949f\u62e8\u5feb
+B1|study|take into account|v. \u987e\u53ca; \u91cd\u89c6\uff0c\u8003\u8651
+B1|study|come to a conclusion|come to a conclusion
+B1|study|make a difference|\u6709\u5f71\u54cd; \u8d77\uff08\u91cd\u8981\uff09\u4f5c\u7528
+B1|time|as soon as|\u4e00\u2026\u5c31\u2026; \u4e00\u7ecf
+B1|time|sooner or later|\u8fdf\u65e9; \u65e9\u665a\u6709\u4e00\u5929
+B1|time|from time to time|\u4e0d\u65f6\uff0c\u5076\u5c14\uff0c\u95f4\u6216; \u65f6\u800c
+B1|time|in the long run|\u4ece\u957f\u8fdc\u6765\u770b\uff0c \u7ec8\u7a76; \u4e00\u6765\u4e8c\u53bb; \u5f52\u6839\u5230\u5e95
+B1|time|at first|\u8d77\u521d\uff0c\u5f53\u521d
+B1|writing|for example|\u4f8b\u5982\uff0c \u8b6c\u5982; \u62ff ... \u6765\u8bf4
+B1|writing|in addition|adv. \u53e6\u5916; \u5e76\u4e14; \u9664\u6b64\u4e4b\u5916; \u51b5\u4e14
+B1|writing|on the other hand|\u5728\u53e6\u4e00\u65b9\u9762
+B1|writing|as a result|\u7ed3\u679c\uff0c \u56e0\u6b64
+B1|writing|in conclusion|\u6700\u540e\uff0c\u7efc\u4e0a\u6240\u8ff0
+CET4|academic|conduct a study|conduct a study
+CET4|academic|draw a conclusion|\u5f97\u51fa\u7ed3\u8bba\uff0c\u544a\u4e00\u6bb5\u843d
+CET4|academic|take measures|v. \u770b\u4e00\u770b\uff0c\u8bbe\u6cd5\uff0c\u7740\u624b
+CET4|academic|play a role|\u8d77\u4f5c\u7528
+CET4|academic|make a contribution|\u5efa\u6811
+CET4|society|give rise to|\u9020\u6210; \u5f15\u8d77\uff0c \u5bfc\u81f4
+CET4|society|be attributed to|\u5f52\u4e8e
+CET4|society|have access to|\u4f7f\u7528; \u63a5\u8fd1; \u53ef\u4ee5\u5229\u7528
+CET4|society|be exposed to|\u906d\u53d7\uff0c\u66b4\u9732\u4e8e\u2026; \u89c1
+CET4|society|take advantage of|v. \u5229\u7528 \u6b3a\u9a97\uff0c\u5360\u2026\u7684\u4fbf\u5b9c
+CET4|economy|result from|\u4ea7\u751f\u4e8e\u2026\uff0c \u7531\u2026\u5f15\u8d77
+CET4|economy|account for|\u8bf4\u660e\uff08\u539f\u56e0\u3001\u7406\u7531\u7b49\uff09; \u5bfc\u81f4\uff0c\u5f15\u8d77; \uff08\u5728\u6570\u91cf\u3001\u6bd4\u4f8b\u4e0a\uff09\u5360; \u5bf9\u2026\u8d1f\u8d23
+CET4|economy|invest in|\u5728\u2026\u4e0a\u6295\u8d44\uff0c\u5728\u2026\u6295\u5165\uff08\u65f6\u95f4\u3001\u7cbe\u529b\u7b49\uff09
+CET4|economy|benefit from|\u53d7\u76ca; \u901a\u8fc7\u2026\u83b7\u76ca; \u5f97\u529b; \u53d7\u7528
+CET4|economy|be based on|\u4ee5\u4e3a\u57fa\u7840
+CET4|technology|keep pace with|v. \u8ddf\u4e0a; \u5e76\u9a7e\u9f50\u9a71; \u8d76\u4e0a
+CET4|technology|be dependent on|v. \u4f9d\u9760\uff0c\u4f9d\u8d56
+CET4|technology|make use of|v. \u4f7f\u7528\uff0c\u5229\u7528; \u5047\u501f; \u85c9; \u501f
+CET4|technology|bring about|\u5b9e\u73b0; \u4f7f\uff08\u8239\uff09\u6389\u8f6c\u8239\u5934; \u9020\u6210\uff0c\u5f15\u8d77[\u5bfc\u81f4]\uff08\u67d0\u4e8b\uff09; \u521b\u9020
+CET4|technology|set up|\u5efa\u7acb; \u51c6\u5907;  \u5b89\u6392; \u5f15\u8d77
+CET4|environment|cope with|\u5bf9\u4ed8\u2026; \u652f\u5e94
+CET4|environment|take action|\u91c7\u53d6\u884c\u52a8\uff0c\u884c\u52a8\u8d77\u6765
+CET4|environment|be aware of|v. \u77e5\u9053 \u610f\u8bc6\u5230
+CET4|environment|contribute to|v. \u6709\u52a9\u4e8e; \u4fc3\u6210 ; \u6350\u732e; \u6295\u7a3f
+CET4|environment|cut down on|\u51cf\u5c11; \u8282\u7701
+CET4|campus|adapt to|\u53d8\u5f97\u4e60\u60ef\u4e8e\u2026\uff0c \u4f7f\u9002\u5e94\u4e8e\uff0c \u80fd\u5e94\u4ed8\u2026; \u968f
+CET4|campus|be engaged in|\u641e; \u4ece\u4e8b\u4e8e; \u52a1; \u5e72
+CET4|campus|apply for|\u7533\u8bf7; \u58f0\u8bf7
+CET4|campus|be qualified for|\u6709\u2026\u7684\u8d44\u683c\uff0c\u9002\u4e8e\u62c5\u4efb\u2026
+CET4|campus|specialize in|\u4e13\u4fee; \u4e13\u653b\uff0c\u7cbe\u901a\uff0c\u4ee5\u2026\u4e3a\u4e13\u4e1a
+CET4|opinion|in terms of|\u6839\u636e; \u7528\u2026\u7684\u8bdd; \u5c31\u2026\u800c\u8a00; \u4ee5\u2026\u4e3a\u5355\u4f4d
+CET4|opinion|with regard to|adv. \u5173\u4e8e; \u5c31; \u8bf4\u8d77
+CET4|opinion|on the contrary|\uff08\u4e0e\u6b64\uff09\u76f8\u53cd\uff0c \u6b63\u76f8\u53cd; \u53cd\u5012; \u53cd\u800c
+CET4|opinion|in contrast|\u76f8\u6bd4\u4e4b\u4e0b
+CET4|opinion|to some extent|\u6709\u6240; \u67d0\u79cd\u7a0b\u5ea6\u4e0a\uff0c\uff08\u591a\u5c11\uff09\u6709\u4e00\u70b9
+CET4|writing|in addition to|adv. \u9664\u2026\u4e4b\u5916
+CET4|writing|due to|\u7531\u4e8e; \u56e0\u4e3a; \u6b20\u4e0b\u503a[\u8d26]\uff0c\u5e94\u7ed9\u4e88; \u5e94\u5f52\u4e8e
+CET4|writing|as a consequence|\u56e0\u800c\uff0c\u7ed3\u679c
+CET4|writing|for the sake of|\u4e3a\u4e86
+CET4|writing|in response to|\u5bf9\u2026\u505a\u51fa\u53cd\u5e94
+CET4|workplace|take responsibility for|take responsibility for
+CET4|workplace|be committed to|\u732e\u8eab\u4e8e\uff0c\u81f4\u529b\u4e8e; \uff08\u540e\u63a5\u540d\u8bcd\u6216\u52a8\u540d\u8bcd\uff0cto\u662f\u4ecb\u8bcd\uff09
+CET4|workplace|work out|\u89e3\u51b3; \u4f5c\u51fa; \u953b\u70bc; \u4e86\u89e3\u67d0\u4eba\u7684\u672c\u8d28
+CET4|workplace|carry out|\u8fdb\u884c; \u6267\u884c; \u5b8c\u6210; \u62ac\u51fa\u53bb
+CET4|workplace|put forward|\u63d0\u51fa; \u5c06\u2026\u63d0\u524d; \u5411\u524d\u79fb; \u5c06\u949f\u62e8\u5feb
+CET4|exam|distinguish between|\u8fa8\u522b\uff0c\u8bc6\u522b\uff08\u4e24\u8005\uff09\u4e4b\u95f4\u7684\u4e0d\u540c; \u8fa8\u660e
+CET4|exam|refer to|\u53c2\u8003; \u6307\u7684\u662f; \u6d89\u53ca; \u9002\u7528\u4e8e
+CET4|exam|account for|\u8bf4\u660e\uff08\u539f\u56e0\u3001\u7406\u7531\u7b49\uff09; \u5bfc\u81f4\uff0c\u5f15\u8d77; \uff08\u5728\u6570\u91cf\u3001\u6bd4\u4f8b\u4e0a\uff09\u5360; \u5bf9\u2026\u8d1f\u8d23
+CET4|exam|give an example of|give an example of
+CET4|exam|draw a distinction|draw a distinction
 `;
 function phraseExample(phrase, theme) {
   const themeName = phraseThemeLabels[theme] || theme;
@@ -208,7 +208,7 @@ function phraseExample(phrase, theme) {
 }
 function phraseExampleZh(phrase, meaning, theme) {
   const themeName = phraseThemeLabels[theme] || theme;
-  return `谈论${themeName}时可以使用词组“${phrase}”，意思是“${meaning}”。`;
+  return `\u8c08\u8bba{theme}\u65f6\u53ef\u4ee5\u4f7f\u7528\u8bcd\u7ec4\u201c{phrase}\u201d\uff0c\u610f\u601d\u662f\u201c{meaning}\u201d\u3002`;
 }
 const phraseSeeds = phraseRows.trim().split(/\r?\n/).filter(Boolean).map((row, index) => {
   const [level, theme, phrase, meaningZh] = row.split('|');
