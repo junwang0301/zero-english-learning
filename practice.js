@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 state.practice = state.practice && typeof state.practice === 'object' ? state.practice : readJSON(STORAGE.practice, { tab: 'grammar', cache: {}, active: null, filter: 'all' });
 state.practice.cache = state.practice.cache || {};
 state.practice.tab = state.practice.tab || 'grammar';
@@ -76,15 +76,17 @@ function validPracticeQuestions(value) {
   }) && counts.mcq === 2 && counts.fill === 2 && counts.correction === 2 && counts.translation === 2;
 }
 async function generateAIQuestions(topic, level, nonce = 0) {
+  const key = `${topic.id}:${level}`;
+  const avoid = (state.practice.cache[key] || []).flatMap(set => (set || []).map(question => question.prompt)).slice(0, 24);
   const messages = [
     { role: 'system', content: 'You are an English grammar teacher. Return JSON only, without Markdown. Return exactly 8 questions with counts mcq 2, fill 2, correction 2, translation 2. All explanation fields MUST be in Simplified Chinese. Keep questions, options, and answers in English.' },
-    { role: 'user', content: `Topic: ${topic.title}. Level: ${level}. Round marker: ${nonce || 'first'}. Summary: ${topic.summary}. Rules: ${topic.rules.map(item => item[1]).join('; ')}. Generate questions different from the previous round. JSON structure: {"questions":[{"id":"q1","type":"mcq|fill|correction|translation","prompt":"question","options":["A","B","C"],"answer":0,"referenceAnswer":"reference answer","explanation":"Chinese explanation"}]}. Multiple-choice questions must include options and a numeric answer.` }
+    { role: 'user', content: `Topic: ${topic.title}. Level: ${level}. Round marker: ${nonce || 'first'}. Summary: ${topic.summary}. Rules: ${topic.rules.map(item => item[1]).join('; ')}. Generate questions different from the previous round. Avoid repeating these questions: ${JSON.stringify(avoid)}. JSON structure: {"questions":[{"id":"q1","type":"mcq|fill|correction|translation","prompt":"question","options":["A","B","C"],"answer":0,"referenceAnswer":"reference answer","explanation":"Chinese explanation"}]}. Multiple-choice questions must include options and a numeric answer.` }
   ];
   let content = '';
   let lastChars = 0;
   let streamStarted = false;
   try {
-    content = await callAIStream(messages, 0.45, (delta, accumulated) => {
+    content = await callAIStream(messages, 0.8, (delta, accumulated) => {
       if (!streamStarted) { streamStarted = true; setLoading(false); }
       const count = accumulated.length;
       if (count - lastChars >= 16) { lastChars = count; practiceStreamStatus('AI \u6b63\u5728\u751f\u6210 8 \u9053\u9898\u2026', count); }
@@ -92,11 +94,11 @@ async function generateAIQuestions(topic, level, nonce = 0) {
   } catch (error) {
     setLoading(false);
     practiceStreamStatus('\u5f53\u524d\u670d\u52a1\u4e0d\u652f\u6301\u6d41\u5f0f\u8f93\u51fa\uff0c\u6b63\u5728\u5207\u6362\u666e\u901a\u6a21\u5f0f\u2026');
-    content = await callAI(messages, 0.45);
+    content = await callAI(messages, 0.8);
   }
   const parsed = extractJSON(content);
   if (!validPracticeQuestions(parsed)) throw new Error('Invalid AI question format');
-  return parsed.questions.map(item => Object.assign({}, item, { id: item.id || uid(), referenceAnswer: item.referenceAnswer || (item.options && item.options[item.answer]) || '' }));
+  return shuffle(parsed.questions.map(item => Object.assign({}, item, { id: item.id || uid(), referenceAnswer: item.referenceAnswer || (item.options && item.options[item.answer]) || '' })));
 }
 function setGrammarSession(topic, level, questions, source) {
   state.practice.active = { topicId: topic.id, topicTitle: topic.title, level, questions, answers: {}, results: null, score: null, source, submitted: false, createdAt: Date.now() };
@@ -121,11 +123,11 @@ async function startGrammarPractice(forceNew = false) {
       setGrammarSession(topic, level, questions, 'AI');
     } catch (error) {
       if (cached.length) setGrammarSession(topic, level, cached[0], 'CACHE');
-      else setGrammarSession(topic, level, practiceQuestionsFromTopic(topic), 'LOCAL');
+      else setGrammarSession(topic, level, shuffle(practiceQuestionsFromTopic(topic)), 'LOCAL');
       showToast(forceNew ? 'AI ????????????' : 'AI ????????????????');
     } finally { setLoading(false); setPracticeButtonsBusy(false); }
   } else {
-    setGrammarSession(topic, level, practiceQuestionsFromTopic(topic), 'LOCAL');
+    setGrammarSession(topic, level, shuffle(practiceQuestionsFromTopic(topic)), 'LOCAL');
   }
   renderPractice();
 }
