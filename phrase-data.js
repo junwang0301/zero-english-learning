@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 const phraseThemeLabels = { life: '日常生活', campus: '校园学习', family: '家庭关系', travel: '旅行出行', hobby: '兴趣爱好', health: '健康生活', time: '时间表达', shopping: '购物消费', food: '饮食用餐', communication: '沟通交流', work: '工作学习', social: '社交关系', technology: '科技网络', environment: '环境社会', opinion: '观点表达', study: '学习方法', writing: '写作表达', academic: '学术表达', society: '社会话题', economy: '经济生活', workplace: '职场表达', exam: '考试表达' };
 const phraseRows = `
 A1|life|get up|起床
