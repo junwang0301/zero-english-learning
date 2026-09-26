@@ -51,7 +51,26 @@ function phraseThemeName(theme) { return phraseThemeLabels[theme] || theme; }
 function savePhraseData() { writeJSON(STORAGE.phrases, state.phrases); }
 function phraseValues() { return Object.values(state.phrases.entries || {}); }
 function phraseRecord(seed) { return { word: normalizePhrase(seed.phrase), displayPhrase: seed.phrase, meaningZh: seed.meaningZh, example: seed.example, exampleZh: seed.exampleZh, level: seed.level, theme: seed.theme, source: seed.source || 'offline', mastery: 0, correct: 0, wrong: 0, nextReview: 0, addedAt: Date.now() }; }
-function ensurePhraseCatalog() { if (state.phrases.catalogSeeded) return; phraseSeeds.forEach(seed => { const key = normalizePhrase(seed.phrase); if (!state.phrases.entries[key]) state.phrases.entries[key] = phraseRecord(seed); }); state.phrases.catalogSeeded = true; savePhraseData(); }
+function ensurePhraseCatalog() {
+  phraseSeeds.forEach(seed => {
+    const key = normalizePhrase(seed.phrase);
+    const existing = state.phrases.entries[key];
+    if (existing) {
+      const repaired = Object.assign(phraseRecord(seed), {
+        mastery: existing.mastery || 0,
+        correct: existing.correct || 0,
+        wrong: existing.wrong || 0,
+        nextReview: existing.nextReview || 0,
+        sentenceHistory: Array.isArray(existing.sentenceHistory) ? existing.sentenceHistory : []
+      });
+      state.phrases.entries[key] = repaired;
+    } else if (!state.phrases.catalogSeeded) {
+      state.phrases.entries[key] = phraseRecord(seed);
+    }
+  });
+  state.phrases.catalogSeeded = true;
+  savePhraseData();
+}
 function phraseStats() { const list = phraseValues(); return { total: list.length, due: list.filter(item => (item.nextReview || 0) <= Date.now()).length, mastered: list.filter(item => (item.mastery || 0) >= 5).length }; }
 function visiblePhraseEntries() { const f = state.phrases.filters; const q = String(f.query || '').trim().toLowerCase(); return phraseValues().filter(item => (f.level === 'all' || item.level === f.level) && (f.theme === 'all' || item.theme === f.theme) && (!q || [item.displayPhrase, item.meaningZh, item.example, item.exampleZh, phraseThemeName(item.theme)].join(' ').toLowerCase().includes(q))).sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0) || a.displayPhrase.localeCompare(b.displayPhrase)); }
 function phraseCardHtml(item) { const key = escapeHtml(item.word); return `<article class="phrase-card"><div class="phrase-card-head"><div><span class="eyebrow">${escapeHtml(item.level)} \u00b7 ${escapeHtml(phraseThemeName(item.theme))}</span><h3>${escapeHtml(item.displayPhrase)}</h3><p class="word-meaning">${escapeHtml(item.meaningZh)}</p></div><button class="card-menu-button" type="button" data-phrase-action="speak" data-phrase-key="${key}" aria-label="${P.speak}">\ud83d\udd0a</button></div><p class="phrase-example">${escapeHtml(item.example)}</p><p class="phrase-example-zh">${escapeHtml(item.exampleZh)}</p><div class="mastery-row">${masteryDots(item.mastery || 0)}<span>${P.mastery} ${Number(item.mastery || 0)}/5</span></div><div class="phrase-actions">${item.mastery ? `<button class="secondary-button small" type="button" data-phrase-action="sentence" data-phrase-key="${key}">${P.sentencePractice}</button>` : ''}<button class="secondary-button small" type="button" data-phrase-action="master" data-phrase-key="${key}">${P.master}</button><button class="text-button" type="button" data-phrase-action="remove" data-phrase-key="${key}">${P.remove}</button></div></article>`; }
