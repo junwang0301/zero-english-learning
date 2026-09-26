@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 const translationRows = `
 A1|life|zh-en|我每天早上七点起床。|I get up at seven every morning.
 A1|campus|zh-en|她每天步行去学校。|She walks to school every day.
