@@ -9,7 +9,9 @@ const STORAGE = {
   practice: 'english-learning:v1:practice',
   wrongBook: 'english-learning:v1:wrong-book',
   writing: 'english-learning:v1:writing',
-  memory: 'english-learning:v1:memory'
+  memory: 'english-learning:v1:memory',
+  phrases: 'english-learning:v1:phrases',
+  translation: 'english-learning:v1:translation'
 };
 const DAY = 24 * 60 * 60 * 1000;
 const REVIEW_INTERVALS = [0, 1, 3, 7, 14, 30];
@@ -619,7 +621,7 @@ function renderMobileNav() {
   const nav = $('#mobileNav');
   nav.innerHTML = [
     ['home', '学习首页'], ['grammar', '语法课堂'], ['practice', '练习中心'], ['reading', '阅读实验室'],
-    ['vocabulary', '我的单词本'], ['settings', 'AI 与数据']
+    ['vocabulary', '我的单词本'], ['phrases', '&#35789;&#32452;&#23398;&#20064;'], ['settings', 'AI 与数据']
   ].map(item => `<button class="nav-item" type="button" data-view="${item[0]}">${item[1]}</button>`).join('');
 }
 function updateStats() {
@@ -2093,7 +2095,7 @@ function exportData() {
   if (includeApiKey && !confirm('备份将包含明文 API Key。不要把此文件分享给他人。是否继续导出？')) return;
   const settingsBackup = Object.assign({}, state.settings); delete settingsBackup.apiKey;
   if (includeApiKey) settingsBackup.apiKey = state.settings.apiKey;
-  const payload = { version: 4, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, practice: state.practice || {}, wrongBook: state.wrongBook || [], writing: state.writing || { draft: null, history: [] }, memory: state.memory || { entries: [] }, settings: settingsBackup };
+  const payload = { version: 5, exportedAt: new Date().toISOString(), progress: state.progress, vocabulary: state.vocabulary, articles: state.articles, practice: state.practice || {}, wrongBook: state.wrongBook || [], writing: state.writing || { draft: null, history: [] }, memory: state.memory || { entries: [] }, phrases: state.phrases || { entries: {}, catalogSeeded: false, filters: { level: "all", theme: "all", query: "" } }, translation: state.translation || { cache: {}, active: null, history: [], level: "A1", theme: "life" }, settings: settingsBackup };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -2120,6 +2122,8 @@ function importData(file) {
       state.wrongBook = Array.isArray(payload.wrongBook) ? payload.wrongBook : [];
       state.writing = payload.writing || { draft: null, history: [] };
       state.memory = payload.memory || { entries: [] };
+      state.phrases = payload.phrases || { entries: {}, catalogSeeded: false, filters: { level: "all", theme: "all", query: "" } };
+      state.translation = payload.translation || { cache: {}, active: null, history: [], level: "A1", theme: "life" };
       if (payload.settings) state.settings = Object.assign({}, state.settings, payload.settings);
       writeJSON(STORAGE.progress, state.progress);
       writeJSON(STORAGE.vocabulary, state.vocabulary);
@@ -2128,6 +2132,8 @@ function importData(file) {
       writeJSON(STORAGE.wrongBook, state.wrongBook);
       writeJSON(STORAGE.writing, state.writing);
       writeJSON(STORAGE.memory, state.memory);
+      writeJSON(STORAGE.phrases, state.phrases);
+      writeJSON(STORAGE.translation, state.translation);
       writeJSON(STORAGE.settings, state.settings);
       renderAll();
   renderLevelSwitchers();
@@ -2146,6 +2152,8 @@ function clearLearningData() {
   state.wrongBook = [];
   state.writing = { draft: null, history: [] };
   state.memory = { entries: [] };
+  state.phrases = { entries: {}, catalogSeeded: false, filters: { level: "all", theme: "all", query: "" } };
+  state.translation = { cache: {}, active: null, history: [], level: "A1", theme: "life" };
   state.review = { queue: [], index: 0, revealed: false, dueOnly: true };
   writeJSON(STORAGE.progress, state.progress);
   writeJSON(STORAGE.vocabulary, state.vocabulary);
@@ -2154,6 +2162,8 @@ function clearLearningData() {
   writeJSON(STORAGE.wrongBook, state.wrongBook);
   writeJSON(STORAGE.writing, state.writing);
   writeJSON(STORAGE.memory, state.memory);
+  writeJSON(STORAGE.phrases, state.phrases);
+  writeJSON(STORAGE.translation, state.translation);
   renderAll();
   showToast('学习数据已清空');
 }
