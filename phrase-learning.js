@@ -1,9 +1,10 @@
-﻿'use strict';
+'use strict';
 STORAGE.phrases = 'english-learning:v1:phrases';
 state.phrases = state.phrases && typeof state.phrases === 'object' ? state.phrases : readJSON(STORAGE.phrases, { entries: {}, catalogSeeded: false, filters: { level: 'all', theme: 'all', query: '' } });
 state.phrases.entries = state.phrases.entries || {};
 state.phrases.filters = Object.assign({ level: 'all', theme: 'all', query: '' }, state.phrases.filters || {});
 let phraseStudy = null;
+let phraseSentencePractice = null;
 const P = {
   title: '\u8bcd\u7ec4\u5b66\u4e60',
   subtitle: '\u6309\u7b49\u7ea7\u548c\u4e3b\u9898\u5b66\u4e60\u5e38\u7528\u8bcd\u7ec4\uff1bAI \u6bcf\u6b21\u8865\u5145 10 \u4e2a\uff0c\u5185\u7f6e\u9898\u5e93\u53ef\u79bb\u7ebf\u4f7f\u7528\u3002',
@@ -36,7 +37,14 @@ const P = {
   aiWorking: 'AI \u6b63\u5728\u751f\u6210\u8bcd\u7ec4\u2026',
   aiSuccess: '\u5df2\u751f\u6210\u65b0\u8bcd\u7ec4\u3002',
   aiFailed: 'AI \u751f\u6210\u5931\u8d25\uff0c\u5df2\u4fdd\u7559\u73b0\u6709\u8bcd\u7ec4\u3002',
-  speak: '\u53d1\u97f3'
+  speak: '\u53d1\u97f3',
+  sentencePractice: '\u9020\u53e5\u7ec3\u4e60',
+  sentenceHint: '\u7528\u8be5\u8bcd\u7ec4\u5199\u4e00\u4e2a\u5b8c\u6574\u7684\u82f1\u6587\u53e5\u5b50\u3002',
+  sentenceSubmit: '\u63d0\u4ea4\u9020\u53e5',
+  sentenceCorrect: '\u9020\u53e5\u6b63\u786e\uff0c\u8bcd\u7ec4\u4f7f\u7528\u81ea\u7136\u3002',
+  sentenceWrong: '\u8fd8\u9700\u4fee\u6539\u3002\u53c2\u8003\u4f8b\u53e5\uff1a',
+  sentenceClose: '\u8fd4\u56de\u8bcd\u7ec4\u8868',
+  sentenceAgain: '\u518d\u7ec3\u4e00\u53e5'
 };
 function normalizePhrase(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
 function phraseThemeName(theme) { return phraseThemeLabels[theme] || theme; }
@@ -46,12 +54,13 @@ function phraseRecord(seed) { return { word: normalizePhrase(seed.phrase), displ
 function ensurePhraseCatalog() { if (state.phrases.catalogSeeded) return; phraseSeeds.forEach(seed => { const key = normalizePhrase(seed.phrase); if (!state.phrases.entries[key]) state.phrases.entries[key] = phraseRecord(seed); }); state.phrases.catalogSeeded = true; savePhraseData(); }
 function phraseStats() { const list = phraseValues(); return { total: list.length, due: list.filter(item => (item.nextReview || 0) <= Date.now()).length, mastered: list.filter(item => (item.mastery || 0) >= 5).length }; }
 function visiblePhraseEntries() { const f = state.phrases.filters; const q = String(f.query || '').trim().toLowerCase(); return phraseValues().filter(item => (f.level === 'all' || item.level === f.level) && (f.theme === 'all' || item.theme === f.theme) && (!q || [item.displayPhrase, item.meaningZh, item.example, item.exampleZh, phraseThemeName(item.theme)].join(' ').toLowerCase().includes(q))).sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0) || a.displayPhrase.localeCompare(b.displayPhrase)); }
-function phraseCardHtml(item) { const key = escapeHtml(item.word); return `<article class="phrase-card"><div class="phrase-card-head"><div><span class="eyebrow">${escapeHtml(item.level)} \u00b7 ${escapeHtml(phraseThemeName(item.theme))}</span><h3>${escapeHtml(item.displayPhrase)}</h3><p class="word-meaning">${escapeHtml(item.meaningZh)}</p></div><button class="card-menu-button" type="button" data-phrase-action="speak" data-phrase-key="${key}" aria-label="${P.speak}">\ud83d\udd0a</button></div><p class="phrase-example">${escapeHtml(item.example)}</p><p class="phrase-example-zh">${escapeHtml(item.exampleZh)}</p><div class="mastery-row">${masteryDots(item.mastery || 0)}<span>${P.mastery} ${Number(item.mastery || 0)}/5</span></div><div class="phrase-actions"><button class="secondary-button small" type="button" data-phrase-action="master" data-phrase-key="${key}">${P.master}</button><button class="text-button" type="button" data-phrase-action="remove" data-phrase-key="${key}">${P.remove}</button></div></article>`; }
+function phraseCardHtml(item) { const key = escapeHtml(item.word); return `<article class="phrase-card"><div class="phrase-card-head"><div><span class="eyebrow">${escapeHtml(item.level)} \u00b7 ${escapeHtml(phraseThemeName(item.theme))}</span><h3>${escapeHtml(item.displayPhrase)}</h3><p class="word-meaning">${escapeHtml(item.meaningZh)}</p></div><button class="card-menu-button" type="button" data-phrase-action="speak" data-phrase-key="${key}" aria-label="${P.speak}">\ud83d\udd0a</button></div><p class="phrase-example">${escapeHtml(item.example)}</p><p class="phrase-example-zh">${escapeHtml(item.exampleZh)}</p><div class="mastery-row">${masteryDots(item.mastery || 0)}<span>${P.mastery} ${Number(item.mastery || 0)}/5</span></div><div class="phrase-actions">${item.mastery ? `<button class="secondary-button small" type="button" data-phrase-action="sentence" data-phrase-key="${key}">${P.sentencePractice}</button>` : ''}<button class="secondary-button small" type="button" data-phrase-action="master" data-phrase-key="${key}">${P.master}</button><button class="text-button" type="button" data-phrase-action="remove" data-phrase-key="${key}">${P.remove}</button></div></article>`; }
 function renderPhraseView() {
   ensurePhraseCatalog();
   const root = $('#phrasePage');
   if (!root) return;
   if (phraseStudy) { root.innerHTML = renderPhraseStudy(); return; }
+  if (phraseSentencePractice) { root.innerHTML = renderPhraseSentence(); return; }
   const stats = phraseStats();
   const filters = state.phrases.filters;
   const themes = Array.from(new Set(phraseValues().map(item => item.theme))).sort();
@@ -142,3 +151,46 @@ document.addEventListener('change', event => { if (event.target && event.target.
 const phraseBaseShowView = showView;
 showView = function (view) { phraseBaseShowView(view); if (view === 'phrases') renderPhraseView(); };
 window.renderPhraseView = renderPhraseView;
+function startPhraseSentence(key) {
+  const item = phraseValues().find(entry => entry.word === key);
+  if (!item) return;
+  phraseStudy = null;
+  phraseSentencePractice = { key, feedback: null };
+  renderPhraseView();
+}
+function renderPhraseSentence() {
+  const item = phraseValues().find(entry => entry.word === phraseSentencePractice.key);
+  if (!item) { phraseSentencePractice = null; renderPhraseView(); return ''; }
+  const feedback = phraseSentencePractice.feedback ? `<div class="answer-feedback ${phraseSentencePractice.feedback.correct ? 'ok' : 'no'}">${phraseSentencePractice.feedback.correct ? P.sentenceCorrect : P.sentenceWrong + escapeHtml(phraseSentencePractice.feedback.reference)}</div>` : '';
+  return `<div class="practice-panel phrase-sentence-panel"><div class="practice-panel-intro"><span class="eyebrow">SENTENCE PRACTICE</span><h2>${P.sentencePractice}</h2><p>${escapeHtml(item.displayPhrase)} \u00b7 ${escapeHtml(item.meaningZh)}</p><p class="muted">${P.sentenceHint}</p></div><div class="practice-topic-preview"><strong>${escapeHtml(item.example)}</strong><span>${escapeHtml(item.exampleZh)}</span></div><textarea id="phraseSentenceInput" class="writing-input" placeholder="${P.sentenceHint}">${escapeHtml(phraseSentencePractice.answer || '')}</textarea>${feedback}<div class="form-actions"><button class="primary-button" type="button" data-phrase-action="sentence-submit">${P.sentenceSubmit}</button><button class="secondary-button" type="button" data-phrase-action="sentence-again">${P.sentenceAgain}</button><button class="text-button" type="button" data-phrase-action="sentence-close">${P.sentenceClose}</button></div></div>`;
+}
+async function submitPhraseSentence() {
+  const item = phraseValues().find(entry => entry.word === phraseSentencePractice.key);
+  if (!item) return;
+  const input = $('#phraseSentenceInput');
+  const answer = input ? input.value.trim() : '';
+  if (!answer) { showToast(P.sentenceHint); return; }
+  phraseSentencePractice.answer = answer;
+  let feedback = { correct: false, reference: item.example };
+  const localCorrect = answer.toLowerCase().includes(item.displayPhrase.toLowerCase()) && answer.split(/\s+/).length >= 4;
+  if (isAIConfigured()) {
+    setLoading(true, 'AI \u6b63\u5728\u68c0\u67e5\u9020\u53e5\u2026');
+    try {
+      const parsed = extractJSON(await callAI([{ role: 'system', content: 'You are an English teacher. Check whether the student sentence uses the given phrase correctly. Return JSON only: {"correct":true,"feedback":"Chinese feedback","correctedSentence":"","reference":"","explanation":""}. Feedback MUST be Simplified Chinese.' }, { role: 'user', content: `Phrase: ${item.displayPhrase}. Meaning: ${item.meaningZh}. Student sentence: ${answer}. Reference sentence: ${item.example}.` }], 0.2));
+      if (parsed && typeof parsed.correct === 'boolean') feedback = { correct: parsed.correct, feedback: parsed.feedback || '', reference: parsed.correctedSentence || parsed.reference || item.example };
+    } catch (error) { feedback = { correct: localCorrect, reference: item.example }; }
+    finally { setLoading(false); }
+  } else feedback = { correct: localCorrect, reference: item.example };
+  item.sentenceHistory = [{ answer, correct: feedback.correct, feedback: feedback.feedback || '', createdAt: Date.now() }].concat(item.sentenceHistory || []).slice(0, 5);
+  phraseSentencePractice.feedback = feedback;
+  savePhraseData(); renderPhraseView();
+}
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-phrase-action]');
+  if (!button) return;
+  const action = button.dataset.phraseAction;
+  if (action === 'sentence') startPhraseSentence(button.dataset.phraseKey);
+  else if (action === 'sentence-submit') submitPhraseSentence();
+  else if (action === 'sentence-again') { phraseSentencePractice.feedback = null; phraseSentencePractice.answer = ''; renderPhraseView(); }
+  else if (action === 'sentence-close') { phraseSentencePractice = null; renderPhraseView(); }
+});
