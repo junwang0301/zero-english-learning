@@ -693,3 +693,8 @@ html[data-theme="dark"] .memory-prompt-card { background: #17231d; color: var(--
 @media (max-width:860px) { .phrase-config { grid-template-columns:1fr 1fr; } .phrase-list { grid-template-columns:1fr; } }
 @media (max-width:620px) { .phrase-config { grid-template-columns:1fr; } .phrase-config button { width:100%; } .phrase-card { padding:15px; } }
 html[data-theme="dark"] .phrase-card { background:#17231d; }
+
+.phrase-study-panel .study-option { border-color: var(--line); background: #fff; color: var(--ink); }
+.phrase-study-panel .study-option:hover { background: #eef5ef; }
+.phrase-study-panel .study-input-row input { border-color: var(--line); background: #fff; color: var(--ink); }
+.phrase-study-panel .study-input-row input::placeholder { color: var(--muted); }
