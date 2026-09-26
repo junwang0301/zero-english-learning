@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="零基础英语语法学习、文章阅读与生词记忆">
   <title>英语起步课 · 零基础 A1 学习站</title>
-  <link rel="stylesheet" href="styles.css?v=20260921-defect-fix-20">
+  <link rel="stylesheet" href="styles.css?v=20260921-defect-fix-21">
 </head>
 <body>
   <div class="app-shell">
@@ -26,7 +26,7 @@
         <button class="nav-item" type="button" data-view="practice"><span>练</span>练习中心</button>
         <button class="nav-item" type="button" data-view="reading"><span>读</span>阅读实验室</button>
         <button class="nav-item" type="button" data-view="vocabulary"><span>词</span>我的单词本 <b id="navDueCount" class="nav-badge hidden">0</b></button>
-        <button class="nav-item" type="button" data-view="settings"><span>⚙</span>AI 与数据</button>
+        <button class="nav-item" type="button" data-view="phrases"><span>&#35789;</span>&#35789;&#32452;&#23398;&#20064;</button><button class="nav-item" type="button" data-view="settings"><span>⚙</span>AI 与数据</button>
       </nav>
       <div class="sidebar-card">
         <div class="eyebrow">今日复习</div>
@@ -115,7 +115,7 @@
 
       <section id="view-practice" class="view" aria-labelledby="practiceTitle">
         <div class="page-heading"><div><span class="eyebrow">PRACTICE CENTER</span><h1 id="practiceTitle">练习中心</h1><p>语法专项、错题本和写作练习集中管理；没有配置 AI 时仍可使用离线题库和本地范文。</p></div><div id="practiceSummary" class="practice-summary"></div></div>
-        <div id="practiceTabs" class="practice-tabs" role="tablist"><button class="practice-tab active" type="button" data-practice-tab="grammar" role="tab">语法专项</button><button class="practice-tab" type="button" data-practice-tab="wrong" role="tab">错题本</button><button class="practice-tab" type="button" data-practice-tab="writing" role="tab">写作练习</button><button class="practice-tab" type="button" data-practice-tab="memory" role="tab">记忆本</button></div>
+        <div id="practiceTabs" class="practice-tabs" role="tablist"><button class="practice-tab active" type="button" data-practice-tab="grammar" role="tab">语法专项</button><button class="practice-tab" type="button" data-practice-tab="wrong" role="tab">错题本</button><button class="practice-tab" type="button" data-practice-tab="writing" role="tab">写作练习</button><button class="practice-tab" type="button" data-practice-tab="translation">&#32763;&#35793;&#32451;&#20064;</button><button class="practice-tab" type="button" data-practice-tab="memory" role="tab">记忆本</button></div>
         <div id="practiceContent" class="practice-content"></div>
       </section>
 
@@ -195,7 +195,7 @@
         <div id="vocabularyList" class="vocabulary-list"></div>
       </section>
 
-      <section id="view-settings" class="view" aria-labelledby="settingsTitle">
+      <section id="view-phrases" class="view" aria-labelledby="phraseTitle"><div class="page-heading"><div><span class="eyebrow">PHRASE LAB</span><h1 id="phraseTitle">&#35789;&#32452;&#23398;&#20064;</h1><p>&#25353;&#31561;&#32423;&#21644;&#20027;&#39064;&#23398;&#20064;&#24120;&#29992;&#35789;&#32452;&#65292;&#24182;&#32467;&#21512;&#38388;&#38548;&#22797;&#20064;&#24041;&#22266;&#12290;</p></div></div><div id="phrasePage"></div></section><section id="view-settings" class="view" aria-labelledby="settingsTitle">
         <div class="page-heading">
           <div><span class="eyebrow">SETTINGS & DATA</span><h1 id="settingsTitle">AI 与学习数据</h1><p>网站为纯静态页面。AI Key 只保存在当前浏览器，并直接发送到你配置的服务商。</p></div>
         </div>
@@ -244,10 +244,14 @@
 
   <script src="cet4-words.js" defer></script>
   <script src="videos.js" defer></script>
-  <script src="grammar-data.js?v=20260921-defect-fix-20" defer></script>
-  <script src="app.js?v=20260921-defect-fix-20" defer></script>
-  <script src="practice.js?v=20260921-defect-fix-20" defer></script>
-  <script src="ui-enhancements.js?v=20260921-defect-fix-20" defer></script>
+  <script src="phrase-data.js?v=20260921-defect-fix-21" defer></script>
+<script src="translation-data.js?v=20260921-defect-fix-21" defer></script>
+<script src="grammar-data.js?v=20260921-defect-fix-21" defer></script>
+  <script src="app.js?v=20260921-defect-fix-21" defer></script>
+  <script src="practice.js?v=20260921-defect-fix-21" defer></script>
+  <script src="phrase-learning.js?v=20260921-defect-fix-21" defer></script>
+<script src="translation-practice.js?v=20260921-defect-fix-21" defer></script>
+<script src="ui-enhancements.js?v=20260921-defect-fix-21" defer></script>
 </body>
 </html>
 
