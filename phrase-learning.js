@@ -47,10 +47,16 @@ const P = {
   sentenceAgain: '\u518d\u7ec3\u4e00\u53e5'
 };
 function normalizePhrase(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function cleanPhraseMeaning(value) {
+  let text = String(value || '').replace(/\\b(?:v|n|adj|adv)\\.\\s*/gi, '');
+  const parts = text.split(/[;；]/).map(part => part.trim()).filter(Boolean);
+  const preferred = parts.find(part => /\\u8d77\\u5e8a|\\u7761\\u89c9|\\u64c5\\u957f|\\u5e2e\\u52a9|\\u53c2\\u52a0|\\u4e00\\u676f/.test(part)) || parts[0] || text;
+  return preferred.replace(/[\\u3002.]+$/, '').trim();
+}
 function phraseThemeName(theme) { return phraseThemeLabels[theme] || theme; }
 function savePhraseData() { writeJSON(STORAGE.phrases, state.phrases); }
 function phraseValues() { return Object.values(state.phrases.entries || {}); }
-function phraseRecord(seed) { return { word: normalizePhrase(seed.phrase), displayPhrase: seed.phrase, meaningZh: seed.meaningZh, example: seed.example, exampleZh: seed.exampleZh, level: seed.level, theme: seed.theme, source: seed.source || 'offline', mastery: 0, correct: 0, wrong: 0, nextReview: 0, addedAt: Date.now() }; }
+function phraseRecord(seed) { return { word: normalizePhrase(seed.phrase), displayPhrase: seed.phrase, meaningZh: cleanPhraseMeaning(seed.meaningZh), example: seed.example, exampleZh: seed.exampleZh, level: seed.level, theme: seed.theme, source: seed.source || 'offline', mastery: 0, correct: 0, wrong: 0, nextReview: 0, addedAt: Date.now() }; }
 function ensurePhraseCatalog() {
   phraseSeeds.forEach(seed => {
     const key = normalizePhrase(seed.phrase);
