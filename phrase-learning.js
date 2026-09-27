@@ -47,33 +47,45 @@ const P = {
   sentenceAgain: '\u518d\u7ec3\u4e00\u53e5'
 };
 function normalizePhrase(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function phraseStorageKey(seed) { const phrase = normalizePhrase(seed && (seed.phrase || seed.displayPhrase || seed.word)); return [phrase, seed && seed.level || '', seed && seed.theme || ''].join('::'); }
 function cleanPhraseMeaning(value) {
-  let text = String(value || '').replace(/\\b(?:v|n|adj|adv)\\.\\s*/gi, '');
-  const parts = text.split(/[;；]/).map(part => part.trim()).filter(Boolean);
-  const preferred = parts.find(part => /\\u8d77\\u5e8a|\\u7761\\u89c9|\\u64c5\\u957f|\\u5e2e\\u52a9|\\u53c2\\u52a0|\\u4e00\\u676f/.test(part)) || parts[0] || text;
-  return preferred.replace(/[\\u3002.]+$/, '').trim();
+  let text = String(value || '').replace(/\b(?:v|n|adj|adv)\.\s*/gi, '');
+  const parts = text.split(/[;\uFF1B]/).map(part => part.trim()).filter(Boolean);
+  const preferred = parts.find(part => /\u8d77\u5e8a|\u7761\u89c9|\u64c5\u957f|\u5e2e\u52a9|\u53c2\u52a0|\u4e00\u676f/.test(part)) || parts[0] || text;
+  return preferred.replace(/[\u3002.]+$/, '').trim();
 }
 function phraseThemeName(theme) { return phraseThemeLabels[theme] || theme; }
 function savePhraseData() { writeJSON(STORAGE.phrases, state.phrases); }
 function phraseValues() { return Object.values(state.phrases.entries || {}); }
-function phraseRecord(seed) { return { word: normalizePhrase(seed.phrase), displayPhrase: seed.phrase, meaningZh: cleanPhraseMeaning(seed.meaningZh), example: seed.example, exampleZh: seed.exampleZh, level: seed.level, theme: seed.theme, source: seed.source || 'offline', mastery: 0, correct: 0, wrong: 0, nextReview: 0, addedAt: Date.now() }; }
+function phraseRecord(seed) { return { word: phraseStorageKey(seed), displayPhrase: seed.phrase, meaningZh: cleanPhraseMeaning(seed.meaningZh), example: seed.example, exampleZh: seed.exampleZh, level: seed.level, theme: seed.theme, source: seed.source || 'offline', mastery: 0, correct: 0, wrong: 0, nextReview: 0, addedAt: Date.now() }; }
 function ensurePhraseCatalog() {
+  const previous = Object.assign({}, state.phrases.entries || {});
+  const next = {};
+  const legacyUsed = new Set();
   phraseSeeds.forEach(seed => {
-    const key = normalizePhrase(seed.phrase);
-    const existing = state.phrases.entries[key];
-    if (existing) {
-      const repaired = Object.assign(phraseRecord(seed), {
-        mastery: existing.mastery || 0,
-        correct: existing.correct || 0,
-        wrong: existing.wrong || 0,
-        nextReview: existing.nextReview || 0,
-        sentenceHistory: Array.isArray(existing.sentenceHistory) ? existing.sentenceHistory : []
-      });
-      state.phrases.entries[key] = repaired;
-    } else if (!state.phrases.catalogSeeded) {
-      state.phrases.entries[key] = phraseRecord(seed);
+    const key = phraseStorageKey(seed);
+    const legacyKey = normalizePhrase(seed.phrase);
+    let existing = previous[key];
+    if (!existing && !legacyUsed.has(legacyKey) && previous[legacyKey]) {
+      existing = previous[legacyKey];
+      legacyUsed.add(legacyKey);
     }
+    const record = phraseRecord(seed);
+    if (existing) {
+      record.mastery = existing.mastery || 0;
+      record.correct = existing.correct || 0;
+      record.wrong = existing.wrong || 0;
+      record.nextReview = existing.nextReview || 0;
+      record.sentenceHistory = Array.isArray(existing.sentenceHistory) ? existing.sentenceHistory : [];
+    }
+    next[key] = record;
   });
+  Object.keys(previous).forEach(key => {
+    const entry = previous[key];
+    const builtIn = phraseSeeds.some(seed => normalizePhrase(seed.phrase) === normalizePhrase(entry && entry.displayPhrase));
+    if (!builtIn && entry && entry.source !== 'offline') next[key] = entry;
+  });
+  state.phrases.entries = next;
   state.phrases.catalogSeeded = true;
   savePhraseData();
 }
@@ -124,8 +136,8 @@ function phraseSubmit(value) {
   let correct = false;
   let answer = item.example;
   if (phraseStudy.stage === 0) { correct = value === item.word; answer = item.meaningZh; }
-  else if (phraseStudy.stage === 1) { correct = normalizePhrase(value) === item.word; answer = item.displayPhrase; }
-  else { const normalized = normalizePhrase(value); correct = normalized === normalizePhrase(item.example) || normalized.includes(item.word); }
+  else if (phraseStudy.stage === 1) { correct = normalizePhrase(value) === normalizePhrase(item.displayPhrase); answer = item.displayPhrase; }
+  else { const normalized = normalizePhrase(value); correct = normalized === normalizePhrase(item.example) || normalized.includes(normalizePhrase(item.displayPhrase)); }
   phraseStudy.feedback = { correct, answer };
   phraseStudy.results[phraseStudy.stage] = correct;
   renderPhraseView();
@@ -150,7 +162,20 @@ async function generatePhrasesWithAI() {
   try {
     const parsed = extractJSON(await callAI([{ role: 'system', content: 'You are an English vocabulary teacher. Return JSON only: {"phrases":[{"phrase":"","meaningZh":"","example":"","exampleZh":""}]}. Return exactly 10 phrases. All meanings and Chinese examples MUST be Simplified Chinese.' }, { role: 'user', content: `Level: ${level}. Theme: ${phraseThemeName(theme)}. Avoid these existing phrases: ${JSON.stringify(existing)}.` }], 0.75));
     if (!parsed || !Array.isArray(parsed.phrases) || parsed.phrases.length < 5) throw new Error('invalid');
-    parsed.phrases.slice(0, 10).forEach(item => { if (!item.phrase || !item.meaningZh) return; const key = normalizePhrase(item.phrase); if (!state.phrases.entries[key]) state.phrases.entries[key] = phraseRecord({ phrase: item.phrase, meaningZh: item.meaningZh, example: item.example || `I can use "${item.phrase}" in ${phraseThemeName(theme)}.`, exampleZh: item.exampleZh || `谈论${phraseThemeName(theme)}时可以使用“${item.meaningZh}”。`, level, theme, source: 'AI' }); });
+    parsed.phrases.slice(0, 10).forEach(item => {
+      if (!item.phrase || !item.meaningZh) return;
+      const seed = {
+        phrase: item.phrase,
+        meaningZh: item.meaningZh,
+        example: item.example || `I can use "${item.phrase}" in ${phraseThemeName(theme)}.`,
+        exampleZh: item.exampleZh || `\u8c08\u8bba${phraseThemeName(theme)}\u65f6\u53ef\u4ee5\u4f7f\u7528\u201c${item.meaningZh}\u201d\u3002`,
+        level,
+        theme,
+        source: 'AI'
+      };
+      const key = phraseStorageKey(seed);
+      if (!state.phrases.entries[key]) state.phrases.entries[key] = phraseRecord(seed);
+    });
     state.phrases.catalogSeeded = true; savePhraseData(); showToast(P.aiSuccess);
   } catch (error) { showToast(P.aiFailed); }
   finally { setLoading(false); renderPhraseView(); }
