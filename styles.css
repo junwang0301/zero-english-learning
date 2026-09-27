@@ -736,3 +736,10 @@ html[data-theme="dark"] .phrase-card { background:#17231d; }
   .phrase-sentence-actions { display: grid; grid-template-columns: 1fr; }
   .phrase-sentence-actions button { width: 100%; }
 }
+/* Phrase loop dark-mode compatibility */
+html[data-theme="dark"] .phrase-collocations span { background: #203027; border-color: #3b5144; color: #bfe3c9; }
+html[data-theme="dark"] .phrase-usage-example,
+html[data-theme="dark"] .phrase-rating-summary { background: #17231d; border-color: #31453a; }
+html[data-theme="dark"] .phrase-hint-box { background: #1d2c24; color: #bfe3c9; }
+html[data-theme="dark"] .phrase-challenge-prompt { background: #2e281b; color: #f1dcb2; }
+html[data-theme="dark"] .phrase-reference { background: #1b2a22; }
