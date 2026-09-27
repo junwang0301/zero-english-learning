@@ -1,5 +1,168 @@
 'use strict';
 const phraseThemeLabels = { life: '\u65e5\u5e38\u751f\u6d3b', campus: '\u6821\u56ed\u5b66\u4e60', family: '\u4eb2\u5c5e\u5173\u7cfb', travel: '\u65c5\u884c', hobby: '\u5174\u8da3\u7231\u597d', health: '\u5065\u5eb7\u536b\u751f', time: '\u65f6\u95f4\u8868\u8fbe', shopping: '\u8d2d\u7269', food: '\u98df\u7269\u548c\u81b3\u98df', communication: '\u6c9f\u901a', work: '\u5de5\u4f5c\u548c\u5b66\u4e60', daily: '\u65e5\u5e38\u751f\u6d3b', social: '\u793e\u4ea4\u751f\u6d3b', technology: '\u79d1\u6280', environment: '\u73af\u5883\u4e0e\u793e\u4f1a', opinion: '\u89c2\u70b9', study: '\u5b66\u4e60\u65b9\u6cd5', writing: '\u5199\u4f5c\u8868\u8fbe', academic: '\u5b66\u672f\u82f1\u8bed', society: '\u793e\u4f1a\u95ee\u9898', economy: '\u7ecf\u6d4e', workplace: '\u804c\u573a', exam: '\u8003\u8bd5' };
+const phraseUsageOverrides = {
+  "a cup of": {
+    "collocations": [
+      "a cup of tea",
+      "a cup of coffee"
+    ],
+    "example": "I drink a cup of tea every morning.",
+    "exampleZh": "\u6211\u6bcf\u5929\u65e9\u4e0a\u559d\u4e00\u676f\u8336\u3002"
+  },
+  "a glass of": {
+    "collocations": [
+      "a glass of water",
+      "a glass of milk"
+    ],
+    "example": "Please give me a glass of water.",
+    "exampleZh": "\u8bf7\u7ed9\u6211\u4e00\u676f\u6c34\u3002"
+  },
+  "a lot of": {
+    "collocations": [
+      "a lot of time",
+      "a lot of people"
+    ],
+    "example": "A lot of students study English online.",
+    "exampleZh": "\u8bb8\u591a\u5b66\u751f\u5728\u7f51\u4e0a\u5b66\u4e60\u82f1\u8bed\u3002"
+  },
+  "account for": {
+    "collocations": [
+      "account for the change",
+      "account for 30 percent"
+    ],
+    "example": "These factors account for the change.",
+    "exampleZh": "\u8fd9\u4e9b\u56e0\u7d20\u89e3\u91ca\u4e86\u8fd9\u4e00\u53d8\u5316\u3002"
+  },
+  "agree with": {
+    "collocations": [
+      "agree with you",
+      "agree with the plan"
+    ],
+    "example": "I agree with your idea.",
+    "exampleZh": "\u6211\u540c\u610f\u4f60\u7684\u60f3\u6cd5\u3002"
+  },
+  "apply for": {
+    "collocations": [
+      "apply for a job",
+      "apply for a visa"
+    ],
+    "example": "She wants to apply for a job.",
+    "exampleZh": "\u5979\u60f3\u7533\u8bf7\u4e00\u4efd\u5de5\u4f5c\u3002"
+  },
+  "arrive at": {
+    "collocations": [
+      "arrive at school",
+      "arrive at the station"
+    ],
+    "example": "We will arrive at the station on time.",
+    "exampleZh": "\u6211\u4eec\u5c06\u51c6\u65f6\u5230\u8fbe\u8f66\u7ad9\u3002"
+  },
+  "as a consequence": {
+    "collocations": [
+      "as a consequence of",
+      "as a consequence, ..."
+    ],
+    "example": "He missed the bus; as a consequence, he was late.",
+    "exampleZh": "\u4ed6\u9519\u8fc7\u4e86\u516c\u4ea4\u8f66\uff0c\u56e0\u6b64\u8fdf\u5230\u4e86\u3002"
+  },
+  "as a result": {
+    "collocations": [
+      "as a result of",
+      "as a result, ..."
+    ],
+    "example": "It rained heavily; as a result, the game was canceled.",
+    "exampleZh": "\u96e8\u4e0b\u5f97\u5f88\u5927\uff0c\u7ed3\u679c\u6bd4\u8d5b\u53d6\u6d88\u4e86\u3002"
+  },
+  "as soon as": {
+    "collocations": [
+      "as soon as possible",
+      "as soon as you arrive"
+    ],
+    "example": "Call me as soon as you arrive.",
+    "exampleZh": "\u4f60\u4e00\u5230\u5c31\u7ed9\u6211\u6253\u7535\u8bdd\u3002"
+  },
+  "get up": {
+    "collocations": [
+      "get up early",
+      "get up at seven"
+    ],
+    "example": "I get up at seven every morning.",
+    "exampleZh": "\u6211\u6bcf\u5929\u65e9\u4e0a\u4e03\u70b9\u8d77\u5e8a\u3002"
+  },
+  "go to bed": {
+    "collocations": [
+      "go to bed early",
+      "go to bed at ten"
+    ],
+    "example": "I go to bed early on school nights.",
+    "exampleZh": "\u4e0a\u5b66\u7684\u665a\u4e0a\u6211\u65e9\u65e9\u4e0a\u5e8a\u7761\u89c9\u3002"
+  },
+  "have breakfast": {
+    "collocations": [
+      "have breakfast at home",
+      "have breakfast with family"
+    ],
+    "example": "We have breakfast at home every day.",
+    "exampleZh": "\u6211\u4eec\u6bcf\u5929\u5728\u5bb6\u5403\u65e9\u996d\u3002"
+  },
+  "take a shower": {
+    "collocations": [
+      "take a shower in the morning",
+      "take a shower before bed"
+    ],
+    "example": "I take a shower before bed.",
+    "exampleZh": "\u6211\u7761\u524d\u6d17\u4e2a\u6fa1\u3002"
+  },
+  "go home": {
+    "collocations": [
+      "go home after work",
+      "go home now"
+    ],
+    "example": "I usually go home after work.",
+    "exampleZh": "\u6211\u901a\u5e38\u4e0b\u73ed\u540e\u56de\u5bb6\u3002"
+  },
+  "go to school": {
+    "collocations": [
+      "go to school by bus",
+      "go to school every day"
+    ],
+    "example": "She will go to school by bus.",
+    "exampleZh": "\u5979\u5c06\u4e58\u516c\u5171\u6c7d\u8f66\u4e0a\u5b66\u3002"
+  },
+  "do homework": {
+    "collocations": [
+      "do homework after dinner",
+      "do homework carefully"
+    ],
+    "example": "I do homework after dinner.",
+    "exampleZh": "\u6211\u665a\u996d\u540e\u505a\u4f5c\u4e1a\u3002"
+  },
+  "look after": {
+    "collocations": [
+      "look after children",
+      "look after your health"
+    ],
+    "example": "She will look after her little brother.",
+    "exampleZh": "\u5979\u4f1a\u7167\u987e\u5979\u7684\u5f1f\u5f1f\u3002"
+  },
+  "help with": {
+    "collocations": [
+      "help with homework",
+      "help with the housework"
+    ],
+    "example": "Can you help with my homework?",
+    "exampleZh": "\u4f60\u80fd\u5e2e\u6211\u505a\u4f5c\u4e1a\u5417\uff1f"
+  },
+  "be good at": {
+    "collocations": [
+      "be good at English",
+      "be good at math"
+    ],
+    "example": "She can be good at English with practice.",
+    "exampleZh": "\u901a\u8fc7\u7ec3\u4e60\uff0c\u5979\u53ef\u4ee5\u64c5\u957f\u82f1\u8bed\u3002"
+  }
+};
+
 const phraseRows = `
 A1|life|get up|\u7ad9\u8d77\u6765; \uff08\u4f7f\uff09\u8d77\u5e8a; \u5b89\u6392; \u4e3e\u8d77
 A1|life|go to bed|\u53bb\u7761\u89c9; \u5b89\u6b47
@@ -202,6 +365,14 @@ CET4|exam|account for|\u8bf4\u660e\uff08\u539f\u56e0\u3001\u7406\u7531\u7b49\uff
 CET4|exam|give an example of|\u4e3e\u4f8b\u8bf4\u660e
 CET4|exam|draw a distinction|\u533a\u5206\uff1b\u533a\u522b
 `;
+function phraseCollocationHints(phrase, theme) {
+  const lower = String(phrase || '').toLowerCase();
+  const themeName = phraseThemeLabels[theme] || theme;
+  const verbLike = /^(be|get|go|take|have|do|make|look|pay|work|come|put|give|keep|carry|set|turn|find|point|ask|reply|apply|deal|depend|arrive|leave|check|run|bring|stand|belong|cut|lead|result|contribute|disagree|believe|refer|conduct|draw|play|invest|benefit|cope|adapt|specialize|distinguish|focus|learn|agree|feel|try|call|listen|talk|say|thank|wake|clean|prepare|meet|log|sign|watch|walk|read|write|study|move|change|start|finish|open|close|send|hold|pick|throw|catch|rely|help|wait|live|spend)/.test(lower);
+  const structure = verbLike ? '\u52a8\u8bcd + \u65f6\u95f4\u3001\u5730\u70b9\u6216\u5bbe\u8bed' : '\u56fa\u5b9a\u8868\u8fbe + \u8bed\u5883\u6216\u540d\u8bcd';
+  return [`\u5e38\u89c1\u4e3b\u9898\uff1a${themeName}`, `\u7ed3\u6784\uff1a${structure}`];
+}
+
 function phraseExample(phrase, theme) {
   const themeName = phraseThemeLabels[theme] || theme;
   return `I can use "${phrase}" when I talk about ${themeName}.`;
@@ -212,5 +383,6 @@ function phraseExampleZh(phrase, meaning, theme) {
 }
 const phraseSeeds = phraseRows.trim().split(/\r?\n/).filter(Boolean).map((row, index) => {
   const [level, theme, phrase, meaningZh] = row.split('|');
-  return { id: `phrase-${index + 1}`, level, theme, phrase, meaningZh, example: phraseExample(phrase, theme), exampleZh: phraseExampleZh(phrase, meaningZh, theme) };
+  const usage = phraseUsageOverrides[phrase.toLowerCase()] || {};
+  return { id: `phrase-${index + 1}`, level, theme, phrase, meaningZh, collocations: usage.collocations || phraseCollocationHints(phrase, theme), example: usage.example || phraseExample(phrase, theme), exampleZh: usage.exampleZh || phraseExampleZh(phrase, meaningZh, theme) };
 });
